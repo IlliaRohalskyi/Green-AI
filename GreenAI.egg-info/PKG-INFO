@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: GreenAI
+Version: 0.0.1
+Requires-Dist: black
+Requires-Dist: dvc_s3
+Requires-Dist: isort
+Requires-Dist: pandas
+Requires-Dist: pyyaml
+Requires-Dist: numpy
+Requires-Dist: scipy
+Requires-Dist: matplotlib
+Requires-Dist: plotly
+Requires-Dist: nbformat
+Requires-Dist: seaborn
