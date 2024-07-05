@@ -1,12 +1,25 @@
 -e .
 black
+bs4
 dvc_s3
 isort
+langchain
+langchain_community
+langchain-experimental
+langgraph
 pandas
+pymupdf
 pyyaml
+nltk
 numpy
+sentence-transformers
 scipy
 matplotlib
+ollama
 plotly
+qdrant-client
 nbformat
 seaborn
+scikit-learn
+tensorflow[and-cuda]
+tensorflow-hub

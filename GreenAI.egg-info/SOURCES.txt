@@ -9,3 +9,9 @@ src/__init__.py
 src/logger.py
 src/utility.py
 src/components/__init__.py
+src/components/agent_based_retriever.py
+src/components/data_scrapper.py
+src/components/document_loader.py
+src/components/retriever.py
+src/components/vector_store.py
+src/pipelines/__init__.py
