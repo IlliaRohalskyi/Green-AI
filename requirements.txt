@@ -2,6 +2,7 @@
 black
 bs4
 dvc_s3
+calflops
 isort
 langchain
 langchain_community
