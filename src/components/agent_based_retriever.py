@@ -11,7 +11,9 @@ memory = SqliteSaver.from_conn_string(":memory:")
 model = OllamaFunctions(
     model="phi3:mini", 
     keep_alive=-1,
-    format="json"
+    format="json",
+    temperature=0,
+    top_p=0.5
 )
 RANKING_PROMPT = """
 You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority such that the total sum is 1.0. The bigger the value, the more important the priority.
