@@ -4,6 +4,7 @@ from langchain_core.messages.system import SystemMessage
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
+from typing import Tuple
 
 memory = SqliteSaver.from_conn_string(":memory:")
 
@@ -12,6 +13,27 @@ model = OllamaFunctions(
     keep_alive=-1,
     format="json"
 )
+RANKING_PROMPT = """
+You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority such that the total sum is 1.0. The bigger the value, the more important the priority.
+
+1. Eco-friendliness: Rank the importance of eco-friendliness
+2. Time efficiency: Rank the importance of time efficiency
+3. Cost efficiency: Rank the importance of cost efficiency
+
+Provide the values in the format of 0.0 to 1.0. Ensure the total sum is 1.0.
+
+4. Reasoning: Explain why you chose the ranking for each priority.
+"""
+
+
+TIME_PROMPT = """
+You are an AI assistant specializing in time estimation. Underhood, we have calculations but it requires you to fill the following information:
+
+1. Amount of samples: Provide the number of samples in the dataset. If you don't have this information, provide an estimate.
+
+2. Input size: Provide the size of the input, for example (256, 256, 3) to specify an image or (1024) to specify the length of a text sequence. If this information is not available, provide an estimate. Use 3D for images and 1D for text.
+
+"""
 
 ARCHITECTURE_PROMPT = """
 You are an AI assistant specializing in recommending AI model architectures and training strategies. Provide concise recommendations:
@@ -49,15 +71,22 @@ class MainState(BaseModel):
     compute: str = Field(description="Available compute")
     time: str = Field(description="Time limit")
     budget: str = Field(description="Budget")
-    eco_rank: int = Field(description="Ranking of eco-friendliness")
-    time_rank: int = Field(description="Ranking of time efficiency")
-    cost_rank: int = Field(description="Ranking of cost efficiency")
+    eco_weight: float = Field(description="Ranking of eco-friendliness")
+    time_weight: float = Field(description="Ranking of time efficiency")
+    cost_weight: float = Field(description="Ranking of cost efficiency")
+    weight_reasoning: str = Field(description="Reasoning behind the chosen ranking")
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
     training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Tuning', 'Full Training', or 'Fine-Tuning the whole model")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
     recommended_gpu: str = Field(description="Recommended GPU for training the model")
     gpu_reasoning: str = Field(description="Reasoning behind the chosen GPU recommendation")
 
+
+class RankingState(BaseModel):
+    eco_weight: float = Field(description="Ranking of eco-friendliness")
+    time_weight: float = Field(description="Ranking of time efficiency")
+    cost_weight: float = Field(description="Ranking of cost efficiency")
+    weight_reasoning: str = Field(description="Reasoning behind the chosen ranking")
 
 class ArchitectureState(BaseModel):
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
@@ -68,6 +97,41 @@ class GpuState(BaseModel):
     recommended_gpu: str = Field(description="Recommended GPU for training the model")
     gpu_reasoning: str = Field(description="Reasoning behind the chosen GPU recommendation")
 
+class TimeState(BaseModel):
+    sample_count: int = Field(description="Number of samples in the dataset")
+    input_size: Tuple = Field(description="Size of the input data")
+
+def ranking_node(state: MainState) -> MainState:
+    messages = [
+        SystemMessage(content=RANKING_PROMPT),
+        HumanMessage(content=f"""
+        Task: {state.task}
+        Data: {state.data}
+        Performance Needs: {state.performance_needs}
+        Compute: {state.compute}
+        Time: {state.time}
+        Budget: {state.budget}
+        """)
+    ]    
+    response = model.with_structured_output(RankingState).invoke(messages)
+    return MainState(
+        task=state.task,
+        data=state.data,
+        performance_needs=state.performance_needs,
+        compute=state.compute,
+        time=state.time,
+        budget=state.budget,
+        weight_reasoning=response.weight_reasoning,
+        eco_weight=response.eco_weight,
+        time_weight=response.time_weight,
+        cost_weight=response.cost_weight,
+        model_architecture="",
+        training_strategy="",
+        architecture_reasoning="",
+        recommended_gpu="",
+        gpu_reasoning=""
+    )
+
 def architecture_node(state: MainState) -> MainState:
     messages = [
         SystemMessage(content=ARCHITECTURE_PROMPT),
@@ -75,11 +139,10 @@ def architecture_node(state: MainState) -> MainState:
         Task: {state.task}
         Data: {state.data}
         Performance Needs: {state.performance_needs}
-        Constraints:
         Compute: {state.compute}
         Time: {state.time}
         Budget: {state.budget}
-        Priorities (Rank 1-3): Eco-friendly {state.eco_rank}, Time-efficient {state.time_rank}, Cost-efficient {state.cost_rank}
+        Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         """)
     ]
     response = model.with_structured_output(ArchitectureState).invoke(messages)
@@ -90,9 +153,10 @@ def architecture_node(state: MainState) -> MainState:
         compute=state.compute,
         time=state.time,
         budget=state.budget,
-        eco_rank=state.eco_rank,
-        time_rank=state.time_rank,
-        cost_rank=state.cost_rank,
+        weight_reasoning=state.weight_reasoning,
+        eco_weight=state.eco_weight,
+        time_weight=state.time_weight,
+        cost_weight=state.cost_weight,
         model_architecture=response.model_architecture,
         training_strategy=response.training_strategy,
         architecture_reasoning=response.architecture_reasoning,
@@ -110,7 +174,7 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         Compute: {state.compute}
         Time: {state.time}
         Budget: {state.budget}
-        Priorities (Rank 1-3): Eco-friendly {state.eco_rank}, Time-efficient {state.time_rank}, Cost-efficient {state.cost_rank}
+        Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         
         Recommended Model Architecture: {state.model_architecture}
         Training Strategy: {state.training_strategy}
@@ -125,9 +189,10 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         compute=state.compute,
         time=state.time,
         budget=state.budget,
-        eco_rank=state.eco_rank,
-        time_rank=state.time_rank,
-        cost_rank=state.cost_rank,
+        weight_reasoning=state.weight_reasoning,
+        eco_weight=state.eco_weight,
+        time_weight=state.time_weight,
+        cost_weight=state.cost_weight,
         model_architecture=state.model_architecture,
         training_strategy=state.training_strategy,
         architecture_reasoning=state.architecture_reasoning,
@@ -135,13 +200,49 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         gpu_reasoning=response.gpu_reasoning
     )
 
+def time_node(state: MainState) -> MainState:
+    messages = [
+        SystemMessage(content=TIME_PROMPT),
+        HumanMessage(content=f"""
+        Task: {state.task}
+        Data: {state.data}
+        Performance Needs: {state.performance_needs}
+        Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
+        """)
+    ]
+    # Invoke the model to get time estimation
+    response = model.with_structured_output(TimeState).invoke(messages)
+    print(response)
+    return MainState(
+        task=state.task,
+        data=state.data,
+        performance_needs=state.performance_needs,
+        compute=state.compute,
+        time=state.time,
+        budget=state.budget,
+        weight_reasoning=state.weight_reasoning,
+        eco_weight=state.eco_weight,
+        time_weight=state.time_weight,
+        cost_weight=state.cost_weight,
+        model_architecture=state.model_architecture,
+        training_strategy=state.training_strategy,
+        architecture_reasoning=state.architecture_reasoning,
+        recommended_gpu=state.recommended_gpu,
+        gpu_reasoning=state.gpu_reasoning
+    )
+
 
 builder = StateGraph(MainState)
 
+builder.add_node("ranking", ranking_node)
 builder.add_node("architecturer", architecture_node)
 builder.add_node("gpu_recommender", gpu_recommendation_node)
-builder.set_entry_point("architecturer")
+builder.add_node("time_estimator", time_node)
+
+builder.set_entry_point("ranking")
+builder.add_edge("ranking", "architecturer")
 builder.add_edge("architecturer", "gpu_recommender")
+builder.add_edge("gpu_recommender", "time_estimator")
 graph = builder.compile(checkpointer=memory)
 
 thread = {"configurable": {"thread_id": "1"}}
@@ -152,9 +253,10 @@ for s in graph.stream(MainState(
     compute="I can use any compute from the cloud providers",
     time="I have few weeks to train the model.",
     budget="Budget is not a major concern. But I want to minimize the cost.",
-    eco_rank=1,
-    time_rank=2,
-    cost_rank=3,
+    weight_reasoning="",
+    eco_weight=0.0,
+    time_weight=0.0,
+    cost_weight=0.0,
     model_architecture="",
     training_strategy="",
     architecture_reasoning="",
