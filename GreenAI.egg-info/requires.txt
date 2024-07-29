@@ -15,6 +15,7 @@ numpy
 sentence-transformers
 scipy
 matplotlib
+openpyxl
 ollama
 plotly
 qdrant-client
