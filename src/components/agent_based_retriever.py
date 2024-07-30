@@ -45,12 +45,38 @@ def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: s
     if training_strategy in ["Fine-tuning the whole model", "Full Training"]:
         return estimated_epochs * sample_count * model_info['FLOPs'].iloc[0] * scaling * 3
     elif training_strategy == "Last Layer Learning":
-        return estimated_epochs * sample_count * 2 * model_info['Last Layer FLOPs'].iloc[0] + model_info['FLOPs'].iloc[0] * scaling / 3
+        return estimated_epochs * sample_count * 2 * model_info['Last Layer FLOPs'].iloc[0] + model_info['FLOPs'].iloc[0] * scaling
     else:
         raise ValueError(f"Unsupported training strategy: {training_strategy}")
 
+def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -> str:
+    path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
+    gpu_df = pd.read_csv(path_to_gpu)
+    gpu_info = gpu_df[gpu_df["name"] == gpu]
 
+    if gpu_info.empty:
+        raise ValueError(f"GPU {gpu} not found in the flops database")
+    
+    tflops_value = gpu_info[tflops].iloc[0]
+    time_seconds = flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
 
+    # Convert seconds to other time units
+    time_minutes = time_seconds / 60
+    time_hours = time_seconds / 3600
+    time_days = time_seconds / 86400
+    time_months = time_seconds / (86400 * 30)  # Approximate month length
+
+    # Format the output string
+    output = (
+        f"Estimated Time:\n"
+        f"{time_seconds:.2f} seconds\n"
+        f"{time_minutes:.2f} minutes\n"
+        f"{time_hours:.2f} hours\n"
+        f"{time_days:.2f} days\n"
+        f"{time_months:.2f} months"
+    )
+    
+    return output
 
 RANKING_PROMPT = """
 You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority such that the total sum is 1.0. The bigger the value, the more important the priority.
@@ -74,6 +100,8 @@ You are an AI assistant specializing in time estimation. Underhood, we have calc
 2. Input size: Provide the size of the input, for example (256, 256, 3) to specify an image or (512, ) to specify the length of a text sequence. If this information is not available, provide an estimate. Use 3D for images and 1D for text.
 
 3. Estimated number of epochs: Provide the estimated number of epochs to train the model. Take into account the model architecture complexity and the size of the dataset.
+
+4. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Output a string "TFLOPS32" or "TFLOPS16".
 """
 
 ARCHITECTURE_PROMPT = f"""
@@ -98,7 +126,7 @@ You are an AI assistant specializing in recommending GPUs for training deep lear
 
 Provide:
 
-1. Recommended GPU: Provide the GPU name that best suits the task.
+1. Recommended GPU: Select a GPU from the list of GPUs: "Tesla V100-PCIE-16GB", "Tesla P100", "T4", "A100 PCIe 40/80GB"
 
 2. Reasoning: Explain why the recommended GPU is appropriate given the task requirements, compute availability, time limit, budget constraints, and eco-efficiency considerations.
 
@@ -141,6 +169,7 @@ class TimeState(BaseModel):
     sample_count: int = Field(description="Number of samples in the dataset")
     input_size: Tuple = Field(description="Size of the input data")
     estimated_epochs: int = Field(description="Estimated number of epochs to train the model")
+    tflops_precision: str = Field(description="TFLOPS precision for the GPU")
 
 def ranking_node(state: MainState) -> MainState:
     messages = [
@@ -248,8 +277,10 @@ def time_node(state: MainState) -> MainState:
     # Invoke the model to get time estimation
     response = model.with_structured_output(TimeState).invoke(messages)
     flops = estimate_flops(state.model_architecture, response.input_size, state.training_strategy, response.sample_count, response.estimated_epochs)
+    time = estimate_time(flops, state.recommended_gpu, state.training_strategy, response.tflops_precision)
     print(response)
     print("FLOPs:", flops)
+    print(time)
     return MainState(
         task=state.task,
         data=state.data,
