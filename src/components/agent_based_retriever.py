@@ -19,6 +19,21 @@ model = OllamaFunctions(
     top_p=0.2
 )
 
+def calculate_kwh_consumption(gpu_name, time_seconds):
+    path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
+    gpu_df = pd.read_csv(path_to_gpu)
+
+    tdp_watts = gpu_df.loc[gpu_df['name'] == gpu_name, 'tdp_watts'].values[0]
+    
+    tdp_kw = tdp_watts / 1000
+    
+    time_hours = time_seconds / 3600
+    
+    energy_consumption_kwh = tdp_kw * time_hours
+    
+    return energy_consumption_kwh
+
+
 def get_all_models() -> List[str]:
     path_to_models = os.path.join(get_root(), "data", "model_flops", "model_flops.xlsx")
     models = pd.read_excel(path_to_models)['Model']
@@ -49,7 +64,7 @@ def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: s
     else:
         raise ValueError(f"Unsupported training strategy: {training_strategy}")
 
-def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -> str:
+def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -> Tuple[str, float]:
     path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
     gpu_df = pd.read_csv(path_to_gpu)
     gpu_info = gpu_df[gpu_df["name"] == gpu]
@@ -60,23 +75,28 @@ def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -
     tflops_value = gpu_info[tflops].iloc[0]
     time_seconds = flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
 
-    # Convert seconds to other time units
-    time_minutes = time_seconds / 60
-    time_hours = time_seconds / 3600
-    time_days = time_seconds / 86400
-    time_months = time_seconds / (86400 * 30)  # Approximate month length
+    seconds = int(time_seconds % 60)
+    minutes = int((time_seconds // 60) % 60)
+    hours = int((time_seconds // 3600) % 24)
+    days = int((time_seconds // 86400) % 30)
+    months = int(time_seconds // (86400 * 30))  # Approximate month length
 
-    # Format the output string
-    output = (
-        f"Estimated Time:\n"
-        f"{time_seconds:.2f} seconds\n"
-        f"{time_minutes:.2f} minutes\n"
-        f"{time_hours:.2f} hours\n"
-        f"{time_days:.2f} days\n"
-        f"{time_months:.2f} months"
-    )
-    
-    return output
+    # Create the formatted output string
+    output = []
+    if months > 0:
+        output.append(f"{months} month{'s' if months > 1 else ''}")
+    if days > 0:
+        output.append(f"{days} day{'s' if days > 1 else ''}")
+    if hours > 0:
+        output.append(f"{hours} hour{'s' if hours > 1 else ''}")
+    if minutes > 0:
+        output.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
+    if seconds > 0 or not output:
+        output.append(f"{seconds} second{'s' if seconds > 1 else ''}")
+
+    formatted_time = ', '.join(output[:-1]) + f" and {output[-1]}" if len(output) > 1 else output[0]
+
+    return formatted_time, time_seconds
 
 RANKING_PROMPT = """
 You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority such that the total sum is 1.0. The bigger the value, the more important the priority.
@@ -281,6 +301,8 @@ def time_node(state: MainState) -> MainState:
     print(response)
     print("FLOPs:", flops)
     print(time)
+    energy_consumption = calculate_kwh_consumption(state.recommended_gpu, time[1])
+    print("Energy Consumption (kWh):", energy_consumption)
     return MainState(
         task=state.task,
         data=state.data,
