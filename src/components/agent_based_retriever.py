@@ -8,6 +8,7 @@ from typing import Tuple, List
 import pandas as pd
 from src.utility import get_root
 import os
+import numpy as np
 
 memory = SqliteSaver.from_conn_string(":memory:")
 
@@ -18,6 +19,71 @@ model = OllamaFunctions(
     temperature=0,
     top_p=0.2
 )
+
+def normalize_data(data):
+    return (data - data.min()) / (data.max() - data.min())
+
+
+def get_tflops_value(perf_data, tflops_type):
+    if pd.notna(perf_data.get(tflops_type, np.nan)):
+        return perf_data[tflops_type]
+    elif pd.notna(perf_data.get('TFLOPS32', np.nan)):
+        return perf_data['TFLOPS32']
+    elif pd.notna(perf_data.get('TFLOPS16', np.nan)):
+        return perf_data['TFLOPS16']
+    else:
+        raise ValueError(f"No valid TFLOPS value found for the GPU: {perf_data['name']}")
+
+def recommend_gpu(scores, tflops_type):
+    pricing_df = pd.read_excel(os.path.join(get_root(), 'data', 'pricing', 'GCP gpus pricing.xlsx'))
+    pricing_df.columns = ['Region', 'GPU', 'Price']
+    gpu_prices = pricing_df.groupby('GPU')['Price'].mean().reset_index()
+    gpu_prices['Normalized_Price'] = normalize_data(gpu_prices['Price'])
+    
+    performance_df = pd.read_csv(os.path.join(get_root(), 'data', 'gpus.csv'))
+    
+    manual_map = {
+        'T4': 'T4',
+        'V100': 'Tesla V100-PCIE-16GB',
+        'P100': 'Tesla P100',
+        'K80': 'Tesla K80',
+    }
+    
+    gpu_prices['Mapped_GPU'] = gpu_prices['GPU'].apply(lambda x: manual_map.get(x, x))
+    performance_data = {row['name']: row for _, row in performance_df.iterrows()}
+    
+    merged_data = []
+    for _, row in gpu_prices.iterrows():
+        pricing_gpu = row['Mapped_GPU']
+        if pricing_gpu in performance_data:
+            perf_data = performance_data[pricing_gpu]
+            tflops_value = get_tflops_value(perf_data, tflops_type)
+            tflops_per_watt = tflops_value / perf_data['tdp_watts']
+            merged_data.append({
+                'GPU': row['GPU'],
+                'Mapped_GPU': pricing_gpu,
+                'Price': row['Price'],
+                'Normalized_Price': row['Normalized_Price'],
+                'TDP_Watts': perf_data['tdp_watts'],
+                tflops_type: tflops_value,
+                'TFLOPS_per_Watt': tflops_per_watt
+            })
+    
+    merged_df = pd.DataFrame(merged_data)
+    
+    merged_df['Normalized_TFLOPS'] = normalize_data(merged_df[tflops_type])
+    merged_df['Normalized_TDP'] = normalize_data(merged_df['TDP_Watts'])
+    merged_df['Normalized_TFLOPS_per_Watt'] = normalize_data(merged_df['TFLOPS_per_Watt'])
+
+    merged_df['Price_Score'] = (1 - merged_df['Normalized_Price']) * scores['price']
+    merged_df['TFLOPS_Score'] = merged_df['Normalized_TFLOPS'] * scores['time']
+    merged_df['TDP_Score'] = merged_df['Normalized_TFLOPS_per_Watt'] * scores['co2']
+
+    merged_df['Total_Score'] = merged_df['Price_Score'] + merged_df['TFLOPS_Score'] + merged_df['TDP_Score']
+    
+    best_gpu = merged_df.sort_values('Total_Score', ascending=False).iloc[0]
+    
+    return best_gpu['Mapped_GPU']
 
 def calculate_kwh_consumption(gpu_name, time_seconds):
     path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
@@ -79,9 +145,8 @@ def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -
     minutes = int((time_seconds // 60) % 60)
     hours = int((time_seconds // 3600) % 24)
     days = int((time_seconds // 86400) % 30)
-    months = int(time_seconds // (86400 * 30))  # Approximate month length
+    months = int(time_seconds // (86400 * 30))
 
-    # Create the formatted output string
     output = []
     if months > 0:
         output.append(f"{months} month{'s' if months > 1 else ''}")
@@ -265,7 +330,6 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         Training Strategy: {state.training_strategy}
         """)
     ]
-    # Invoke the model to get GPU recommendation
     response = model.with_structured_output(GpuState).invoke(messages)
     return MainState(
         task=state.task,
@@ -294,7 +358,6 @@ def time_node(state: MainState) -> MainState:
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         """)
     ]
-    # Invoke the model to get time estimation
     response = model.with_structured_output(TimeState).invoke(messages)
     flops = estimate_flops(state.model_architecture, response.input_size, state.training_strategy, response.sample_count, response.estimated_epochs)
     time = estimate_time(flops, state.recommended_gpu, state.training_strategy, response.tflops_precision)
