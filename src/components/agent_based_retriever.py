@@ -138,7 +138,7 @@ def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -
     if gpu_info.empty:
         raise ValueError(f"GPU {gpu} not found in the flops database")
     
-    tflops_value = gpu_info[tflops].iloc[0]
+    tflops_value = get_tflops_value(gpu_info.iloc[0], tflops)
     time_seconds = flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
 
     seconds = int(time_seconds % 60)
@@ -164,16 +164,16 @@ def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -
     return formatted_time, time_seconds
 
 RANKING_PROMPT = """
-You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority such that the total sum is 1.0. The bigger the value, the more important the priority.
+You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority. The bigger the value, the more important the priority.
 Pay attention to the constraints and requirements of the task provided by the user. Be constructive and tell why you chose the ranking for each priority based on the user input.
 
 1. Eco-friendliness: Rank the importance of eco-friendliness
 2. Time efficiency: Rank the importance of time efficiency
 3. Cost efficiency: Rank the importance of cost efficiency
 
-Provide the values in the format of 0.0 to 1.0. Ensure the total sum is 1.0.
+Provide the values in the format of 0.0 to 1.0. For example, 0.4, 0.2, 0.
 
-4. Reasoning: Explain why you chose the ranking for each priority.
+4. Reasoning: Explain why you chose the ranking for each priority without repeating the rankings.
 """
 
 
@@ -224,6 +224,7 @@ class MainState(BaseModel):
     performance_needs: str = Field(description="Performance requirements")
     time: str = Field(description="Time limit")
     budget: str = Field(description="Budget")
+    eco_friendliness: str = Field(description="Eco-friendliness")
     eco_weight: float = Field(description="Ranking of eco-friendliness")
     time_weight: float = Field(description="Ranking of time efficiency")
     cost_weight: float = Field(description="Ranking of cost efficiency")
@@ -265,15 +266,25 @@ def ranking_node(state: MainState) -> MainState:
         Performance Needs: {state.performance_needs}
         Time: {state.time}
         Budget: {state.budget}
+        Eco-friendliness: {state.eco_friendliness}
         """)
     ]    
     response = model.with_structured_output(RankingState).invoke(messages)
+    total_sum = response.eco_weight + response.time_weight + response.cost_weight
+    if total_sum == 0:
+        raise ValueError("Sum of weights is zero, cannot normalize.")
+    
+    response.eco_weight /= total_sum
+    response.time_weight /= total_sum
+    response.cost_weight /= total_sum
+
     return MainState(
         task=state.task,
         data=state.data,
         performance_needs=state.performance_needs,
         time=state.time,
         budget=state.budget,
+        eco_friendliness=state.eco_friendliness,
         weight_reasoning=response.weight_reasoning,
         eco_weight=response.eco_weight,
         time_weight=response.time_weight,
@@ -294,6 +305,7 @@ def architecture_node(state: MainState) -> MainState:
         Performance Needs: {state.performance_needs}
         Time: {state.time}
         Budget: {state.budget}
+        Eco-friendliness: {state.eco_friendliness}
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         """)
     ]
@@ -304,6 +316,7 @@ def architecture_node(state: MainState) -> MainState:
         performance_needs=state.performance_needs,
         time=state.time,
         budget=state.budget,
+        eco_friendliness=state.eco_friendliness,
         weight_reasoning=state.weight_reasoning,
         eco_weight=state.eco_weight,
         time_weight=state.time_weight,
@@ -324,6 +337,7 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         Performance Needs: {state.performance_needs}
         Time: {state.time}
         Budget: {state.budget}
+        Eco-friendliness: {state.eco_friendliness}
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         
         Recommended Model Architecture: {state.model_architecture}
@@ -337,6 +351,7 @@ def gpu_recommendation_node(state: MainState) -> MainState:
         performance_needs=state.performance_needs,
         time=state.time,
         budget=state.budget,
+        eco_friendliness=state.eco_friendliness,
         weight_reasoning=state.weight_reasoning,
         eco_weight=state.eco_weight,
         time_weight=state.time_weight,
@@ -355,11 +370,14 @@ def time_node(state: MainState) -> MainState:
         Task: {state.task}
         Data: {state.data}
         Performance Needs: {state.performance_needs}
+        Eco-friendliness: {state.eco_friendliness}
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         """)
     ]
     response = model.with_structured_output(TimeState).invoke(messages)
+    print(response)
     flops = estimate_flops(state.model_architecture, response.input_size, state.training_strategy, response.sample_count, response.estimated_epochs)
+    print(flops)
     time = estimate_time(flops, state.recommended_gpu, state.training_strategy, response.tflops_precision)
     print(response)
     print("FLOPs:", flops)
@@ -372,6 +390,7 @@ def time_node(state: MainState) -> MainState:
         performance_needs=state.performance_needs,
         time=state.time,
         budget=state.budget,
+        eco_friendliness=state.eco_friendliness,
         weight_reasoning=state.weight_reasoning,
         eco_weight=state.eco_weight,
         time_weight=state.time_weight,
@@ -404,6 +423,7 @@ for s in graph.stream(MainState(
     performance_needs="The model should achieve best accuracy.",
     time="I have few days to train the model.",
     budget="Budget is not a major concern. But I want to minimize the cost.",
+    eco_friendliness="I don't care about eco-friendliness.",
     weight_reasoning="",
     eco_weight=0.0,
     time_weight=0.0,
