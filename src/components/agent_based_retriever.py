@@ -4,11 +4,12 @@ from langchain_core.messages.system import SystemMessage
 from langchain_core.pydantic_v1 import BaseModel, Field
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.sqlite import SqliteSaver
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import pandas as pd
 from src.utility import get_root
 import os
 import numpy as np
+from datetime import timedelta
 
 memory = SqliteSaver.from_conn_string(":memory:")
 
@@ -19,6 +20,11 @@ model = OllamaFunctions(
     temperature=0,
     top_p=0.2
 )
+
+def get_all_models() -> List[str]:
+    path_to_models = os.path.join(get_root(), "data", "model_flops", "model_flops.xlsx")
+    models = pd.read_excel(path_to_models)['Model']
+    return list(models)
 
 def normalize_data(data):
     return (data - data.min()) / (data.max() - data.min())
@@ -34,60 +40,8 @@ def get_tflops_value(perf_data, tflops_type):
     else:
         raise ValueError(f"No valid TFLOPS value found for the GPU: {perf_data['name']}")
 
-def recommend_gpu(scores, tflops_type):
-    pricing_df = pd.read_excel(os.path.join(get_root(), 'data', 'pricing', 'GCP gpus pricing.xlsx'))
-    pricing_df.columns = ['Region', 'GPU', 'Price']
-    gpu_prices = pricing_df.groupby('GPU')['Price'].mean().reset_index()
-    gpu_prices['Normalized_Price'] = normalize_data(gpu_prices['Price'])
-    
-    performance_df = pd.read_csv(os.path.join(get_root(), 'data', 'gpus.csv'))
-    
-    manual_map = {
-        'T4': 'T4',
-        'V100': 'Tesla V100-PCIE-16GB',
-        'P100': 'Tesla P100',
-        'K80': 'Tesla K80',
-    }
-    
-    gpu_prices['Mapped_GPU'] = gpu_prices['GPU'].apply(lambda x: manual_map.get(x, x))
-    performance_data = {row['name']: row for _, row in performance_df.iterrows()}
-    
-    merged_data = []
-    for _, row in gpu_prices.iterrows():
-        pricing_gpu = row['Mapped_GPU']
-        if pricing_gpu in performance_data:
-            perf_data = performance_data[pricing_gpu]
-            tflops_value = get_tflops_value(perf_data, tflops_type)
-            tflops_per_watt = tflops_value / perf_data['tdp_watts']
-            merged_data.append({
-                'GPU': row['GPU'],
-                'Mapped_GPU': pricing_gpu,
-                'Price': row['Price'],
-                'Normalized_Price': row['Normalized_Price'],
-                'TDP_Watts': perf_data['tdp_watts'],
-                tflops_type: tflops_value,
-                'TFLOPS_per_Watt': tflops_per_watt
-            })
-    
-    merged_df = pd.DataFrame(merged_data)
-    
-    merged_df['Normalized_TFLOPS'] = normalize_data(merged_df[tflops_type])
-    merged_df['Normalized_TDP'] = normalize_data(merged_df['TDP_Watts'])
-    merged_df['Normalized_TFLOPS_per_Watt'] = normalize_data(merged_df['TFLOPS_per_Watt'])
 
-    merged_df['Price_Score'] = (1 - merged_df['Normalized_Price']) * scores['price']
-    merged_df['TFLOPS_Score'] = merged_df['Normalized_TFLOPS'] * scores['time']
-    merged_df['TDP_Score'] = merged_df['Normalized_TFLOPS_per_Watt'] * scores['co2']
-
-    merged_df['Total_Score'] = merged_df['Price_Score'] + merged_df['TFLOPS_Score'] + merged_df['TDP_Score']
-    
-    best_gpu = merged_df.sort_values('Total_Score', ascending=False).iloc[0]
-    
-    return best_gpu['Mapped_GPU']
-
-def calculate_kwh_consumption(gpu_name, time_seconds):
-    path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
-    gpu_df = pd.read_csv(path_to_gpu)
+def calculate_kwh_consumption(gpu_name, time_seconds, gpu_df):
 
     tdp_watts = gpu_df.loc[gpu_df['name'] == gpu_name, 'tdp_watts'].values[0]
     
@@ -99,16 +53,7 @@ def calculate_kwh_consumption(gpu_name, time_seconds):
     
     return energy_consumption_kwh
 
-
-def get_all_models() -> List[str]:
-    path_to_models = os.path.join(get_root(), "data", "model_flops", "model_flops.xlsx")
-    models = pd.read_excel(path_to_models)['Model']
-    return list(models)
-
-def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: str, sample_count: int, estimated_epochs: int) -> float:
-    path_to_flops = os.path.join(get_root(), "data", "model_flops", "model_flops.xlsx")
-    flops_df = pd.read_excel(path_to_flops)
-
+def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: str, sample_count: int, estimated_epochs: int, flops_df: pd.DataFrame) -> float:
     model_info = flops_df[flops_df["Model"] == model]
 
     if model_info.empty:
@@ -130,38 +75,122 @@ def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: s
     else:
         raise ValueError(f"Unsupported training strategy: {training_strategy}")
 
-def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str) -> Tuple[str, float]:
-    path_to_gpu = os.path.join(get_root(), "data", "gpus.csv")
-    gpu_df = pd.read_csv(path_to_gpu)
+def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str, gpu_df) -> float:
     gpu_info = gpu_df[gpu_df["name"] == gpu]
 
     if gpu_info.empty:
         raise ValueError(f"GPU {gpu} not found in the flops database")
-    
     tflops_value = get_tflops_value(gpu_info.iloc[0], tflops)
-    time_seconds = flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
+    return flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
 
-    seconds = int(time_seconds % 60)
-    minutes = int((time_seconds // 60) % 60)
-    hours = int((time_seconds // 3600) % 24)
-    days = int((time_seconds // 86400) % 30)
-    months = int(time_seconds // (86400 * 30))
 
-    output = []
+def format_time(seconds):
+    delta = timedelta(seconds=seconds)
+    months, days = divmod(delta.days, 30)
+    hours, remaining = divmod(delta.seconds, 3600)
+    minutes, seconds = divmod(remaining, 60)
+    
+    parts = []
     if months > 0:
-        output.append(f"{months} month{'s' if months > 1 else ''}")
+        parts.append(f"{months}m")
     if days > 0:
-        output.append(f"{days} day{'s' if days > 1 else ''}")
+        parts.append(f"{days}d")
     if hours > 0:
-        output.append(f"{hours} hour{'s' if hours > 1 else ''}")
+        parts.append(f"{hours}h")
     if minutes > 0:
-        output.append(f"{minutes} minute{'s' if minutes > 1 else ''}")
-    if seconds > 0 or not output:
-        output.append(f"{seconds} second{'s' if seconds > 1 else ''}")
+        parts.append(f"{minutes}min")
+    if seconds > 0 or not parts:
+        parts.append(f"{seconds}s")
+    
+    return " ".join(parts)
 
-    formatted_time = ', '.join(output[:-1]) + f" and {output[-1]}" if len(output) > 1 else output[0]
+def calculate_emissions(kwh: float, region: str, emissions_df) -> float:
+    emissions_df = emissions_df[emissions_df['region'] == region]
+    emissions = emissions_df['impact'].iloc[0]
+    return kwh * emissions
 
-    return formatted_time, time_seconds
+def calculate_price(gpu: str, region: str, time: float, pricing_df) -> float:
+    pricing_df = pricing_df[pricing_df['region'] == region]
+    price = pricing_df[pricing_df['gpu'] == gpu]['price'].iloc[0] * time
+    return price
+
+def recommend_gpu_configuration(model, input_size, training_strategy, sample_count, estimated_epochs, 
+                                time_coeff, cost_coeff, co2_coeff, tflops_type,
+                                max_time=None, max_cost=None, max_co2=None):
+
+    pricing_df = pd.read_excel(os.path.join(get_root(), 'data', 'pricing', 'GCP gpus pricing.xlsx'))
+    gpu_df = pd.read_csv(os.path.join(get_root(), 'data', 'gpus.csv'))
+    flops_df = pd.read_excel(os.path.join(get_root(), 'data', 'model_flops', 'model_flops.xlsx'))
+    emissions_df = pd.read_csv(os.path.join(get_root(), 'data', 'impact.csv'))
+    
+    manual_map = {
+        'T4': 'T4',
+        'V100': 'Tesla V100-PCIE-16GB',
+        'P100': 'Tesla P100',
+        'K80': 'Tesla K80',
+    }
+
+    pricing_df['Mapped_GPU'] = pricing_df['gpu'].map(manual_map).fillna(pricing_df['gpu'])
+
+    total_flops = estimate_flops(model, input_size, training_strategy, sample_count, estimated_epochs, flops_df)
+
+    results = []
+
+    for _, price_row in pricing_df.iterrows():
+        gpu_pricing = price_row['gpu']
+        gpu_model_name = price_row['Mapped_GPU']
+        region = price_row['region']
+
+        # Find corresponding performance data
+        perf_data = gpu_df[gpu_df['name'] == gpu_model_name]
+        
+        if perf_data.empty:
+            print(f"Warning: No performance data found for GPU {gpu_model_name}")
+            continue
+
+        time_seconds = estimate_time(total_flops, gpu_model_name, training_strategy, tflops_type, gpu_df)
+        
+        price = calculate_price(gpu_pricing, region, time_seconds / 3600, pricing_df)  # convert seconds to hours
+        
+        kwh = calculate_kwh_consumption(gpu_model_name, time_seconds, gpu_df)
+        co2 = calculate_emissions(kwh, region, emissions_df) / 1000
+        
+        results.append({
+            'GPU': gpu_pricing,
+            'Mapped_GPU': gpu_model_name,
+            'Region': region,
+            'Time': time_seconds,
+            'Time (formatted)': format_time(time_seconds),
+            'Cost ($)': price,
+            'CO2 (kg)': co2
+        })
+
+    # Create DataFrame
+    df = pd.DataFrame(results)
+
+    for col in ['Time', 'Cost ($)', 'CO2 (kg)']:
+        df[f'Normalized_{col}'] = normalize_data(df[col])
+        df[f'{col}_Score'] = (1 - df[f'Normalized_{col}']) * 5 
+
+    df['Ranking'] = (
+        df['Time_Score'] * time_coeff + 
+        df['Cost ($)_Score'] * cost_coeff + 
+        df['CO2 (kg)_Score'] * co2_coeff
+    )
+
+    # Apply constraints
+    if max_time:
+        df = df[df['Time'] <= max_time]
+    if max_cost:
+        df = df[df['Cost ($)'] <= max_cost]
+    if max_co2:
+        df = df[df['CO2 (kg)'] <= max_co2]
+
+    df.dropna(inplace=True)
+    df = df.sort_values('Ranking', ascending=False)
+    df.reset_index(drop=True, inplace=True)
+
+    return df
 
 RANKING_PROMPT = """
 You are an AI assistant specializing in assigning importance to the priorities of eco-friendliness, time efficiency, and cost efficiency. Consider the task and context provided, and provide a ranking for each priority. The bigger the value, the more important the priority.
@@ -177,8 +206,8 @@ Provide the values in the format of 0.0 to 1.0. For example, 0.4, 0.2, 0.
 """
 
 
-TIME_PROMPT = """
-You are an AI assistant specializing in time estimation. Underhood, we have calculations but it requires you to fill the following information:
+CALCULATOR_PROMPT = """
+You are an AI assistant specializing in calculating price, time, and co2 emissions. Underhood, we have calculations but it requires you to fill the following information:
 
 1. Amount of samples: Provide the number of samples in the dataset. If you don't have this information, provide an estimate.
 
@@ -206,17 +235,6 @@ Provide:
 Respond with ONLY these three pieces of information, nothing else.
 """
 
-GPU_AGENT_PROMPT = """
-You are an AI assistant specializing in recommending GPUs for training deep learning models. Provide concise recommendations:
-
-Provide:
-
-1. Recommended GPU: Select a GPU from the list of GPUs: "Tesla V100-PCIE-16GB", "Tesla P100", "T4", "A100 PCIe 40/80GB"
-
-2. Reasoning: Explain why the recommended GPU is appropriate given the task requirements, compute availability, time limit, budget constraints, and eco-efficiency considerations.
-
-Respond with ONLY these two pieces of information, nothing else.
-"""
 
 class MainState(BaseModel):
     task: str = Field(description="The task to be planned")
@@ -234,6 +252,9 @@ class MainState(BaseModel):
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
     recommended_gpu: str = Field(description="Recommended GPU for training the model")
     gpu_reasoning: str = Field(description="Reasoning behind the chosen GPU recommendation")
+    max_time: Optional[float] = Field(description="Maximum time constraint")
+    max_cost: Optional[float] = Field(description="Maximum cost constraint")
+    max_co2: Optional[float] = Field(description="Maximum CO2 emissions constraint")
 
 
 class RankingState(BaseModel):
@@ -247,9 +268,6 @@ class ArchitectureState(BaseModel):
     training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Tuning', 'Full Training', or 'Fine-Tuning the whole model'")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
 
-class GpuState(BaseModel):
-    recommended_gpu: str = Field(description="Recommended GPU for training the model")
-    gpu_reasoning: str = Field(description="Reasoning behind the chosen GPU recommendation")
 
 class TimeState(BaseModel):
     sample_count: int = Field(description="Number of samples in the dataset")
@@ -293,7 +311,10 @@ def ranking_node(state: MainState) -> MainState:
         training_strategy="",
         architecture_reasoning="",
         recommended_gpu="",
-        gpu_reasoning=""
+        gpu_reasoning="",
+        max_time=state.max_time,
+        max_cost=state.max_cost,
+        max_co2=state.max_co2
     )
 
 def architecture_node(state: MainState) -> MainState:
@@ -325,47 +346,16 @@ def architecture_node(state: MainState) -> MainState:
         training_strategy=response.training_strategy,
         architecture_reasoning=response.architecture_reasoning,
         recommended_gpu=state.recommended_gpu,
-        gpu_reasoning=state.gpu_reasoning
+        gpu_reasoning=state.gpu_reasoning,
+        max_time=state.max_time,
+        max_cost=state.max_cost,
+        max_co2=state.max_co2
     )
 
-def gpu_recommendation_node(state: MainState) -> MainState:
-    messages = [
-        SystemMessage(content=GPU_AGENT_PROMPT),
-        HumanMessage(content=f"""
-        Task: {state.task}
-        Data: {state.data}
-        Performance Needs: {state.performance_needs}
-        Time: {state.time}
-        Budget: {state.budget}
-        Eco-friendliness: {state.eco_friendliness}
-        Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
-        
-        Recommended Model Architecture: {state.model_architecture}
-        Training Strategy: {state.training_strategy}
-        """)
-    ]
-    response = model.with_structured_output(GpuState).invoke(messages)
-    return MainState(
-        task=state.task,
-        data=state.data,
-        performance_needs=state.performance_needs,
-        time=state.time,
-        budget=state.budget,
-        eco_friendliness=state.eco_friendliness,
-        weight_reasoning=state.weight_reasoning,
-        eco_weight=state.eco_weight,
-        time_weight=state.time_weight,
-        cost_weight=state.cost_weight,
-        model_architecture=state.model_architecture,
-        training_strategy=state.training_strategy,
-        architecture_reasoning=state.architecture_reasoning,
-        recommended_gpu=response.recommended_gpu,
-        gpu_reasoning=response.gpu_reasoning
-    )
 
-def time_node(state: MainState) -> MainState:
+def calculator_node(state: MainState) -> MainState:
     messages = [
-        SystemMessage(content=TIME_PROMPT),
+        SystemMessage(content=CALCULATOR_PROMPT),
         HumanMessage(content=f"""
         Task: {state.task}
         Data: {state.data}
@@ -375,15 +365,8 @@ def time_node(state: MainState) -> MainState:
         """)
     ]
     response = model.with_structured_output(TimeState).invoke(messages)
-    print(response)
-    flops = estimate_flops(state.model_architecture, response.input_size, state.training_strategy, response.sample_count, response.estimated_epochs)
-    print(flops)
-    time = estimate_time(flops, state.recommended_gpu, state.training_strategy, response.tflops_precision)
-    print(response)
-    print("FLOPs:", flops)
-    print(time)
-    energy_consumption = calculate_kwh_consumption(state.recommended_gpu, time[1])
-    print("Energy Consumption (kWh):", energy_consumption)
+    dataframe = recommend_gpu_configuration(model=state.model_architecture, input_size=response.input_size, training_strategy=state.training_strategy, sample_count=response.sample_count, estimated_epochs=response.estimated_epochs, time_coeff=state.time_weight, cost_coeff=state.cost_weight, co2_coeff=state.eco_weight, tflops_type=response.tflops_precision, max_time=state.max_time, max_cost=state.max_cost, max_co2=state.max_co2)
+    print(dataframe.iloc[0])
     return MainState(
         task=state.task,
         data=state.data,
@@ -399,7 +382,10 @@ def time_node(state: MainState) -> MainState:
         training_strategy=state.training_strategy,
         architecture_reasoning=state.architecture_reasoning,
         recommended_gpu=state.recommended_gpu,
-        gpu_reasoning=state.gpu_reasoning
+        gpu_reasoning=state.gpu_reasoning,
+        max_time=state.max_time,
+        max_cost=state.max_cost,
+        max_co2=state.max_co2
     )
 
 
@@ -407,13 +393,11 @@ builder = StateGraph(MainState)
 
 builder.add_node("ranking", ranking_node)
 builder.add_node("architecturer", architecture_node)
-builder.add_node("gpu_recommender", gpu_recommendation_node)
-builder.add_node("time_estimator", time_node)
+builder.add_node("calculator", calculator_node)
 
 builder.set_entry_point("ranking")
 builder.add_edge("ranking", "architecturer")
-builder.add_edge("architecturer", "gpu_recommender")
-builder.add_edge("gpu_recommender", "time_estimator")
+builder.add_edge("architecturer", "calculator")
 graph = builder.compile(checkpointer=memory)
 
 thread = {"configurable": {"thread_id": "1"}}
@@ -432,6 +416,9 @@ for s in graph.stream(MainState(
     training_strategy="",
     architecture_reasoning="",
     recommended_gpu="",
-    gpu_reasoning=""
+    gpu_reasoning="",
+    max_time=None,
+    max_cost=None,
+    max_co2=None,
 ), thread):
     print(s)
