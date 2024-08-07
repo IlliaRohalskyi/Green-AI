@@ -218,7 +218,6 @@ You are an AI assistant specializing in calculating price, time, and co2 emissio
 
 3. Estimated number of epochs: Provide the estimated number of epochs to train the model. Take into account the model architecture complexity and the size of the dataset.
 
-4. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Output a string "TFLOPS32" or "TFLOPS16".
 """
 
 ARCHITECTURE_PROMPT = f"""
@@ -233,7 +232,9 @@ Provide:
    - "Full Training"
    - "Last Layer Learning"
 
-3. Reasoning: Explain why the chosen training strategy and the model is the best option considering the given constraints.
+3. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Output a string "TFLOPS32" or "TFLOPS16".
+
+4. Reasoning: Explain why the chosen training strategy, model and the TFLOPS type is the best option considering the given constraints.
 
 Respond with ONLY these three pieces of information, nothing else.
 """
@@ -251,7 +252,9 @@ Provide:
    - "Full Training"
    - "Last Layer Learning"
 
-3. Reasoning: Explain why the chosen training strategy and the model is a simpler option that might meet the constraints. Discuss how it differs from the previous recommendation and why it might be more suitable.
+3. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Output a string "TFLOPS32" or "TFLOPS16".
+
+4. Reasoning: Explain why the chosen training strategy, model and the TFLOPS type is the best option considering the given constraints.
 
 Respond with ONLY these three pieces of information, nothing else.
 """
@@ -270,6 +273,7 @@ class MainState(BaseModel):
     weight_reasoning: str = Field(description="Reasoning behind the chosen ranking")
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
     training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Learning', 'Full Training', or 'Fine-Tuning the whole model")
+    flops_precision: str = Field(description="TFLOPS precision for the GPU")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
     dataframe: dict = Field(description="GPU and cloud data")
     max_time: Optional[float] = Field(description="Maximum time constraint")
@@ -288,13 +292,12 @@ class ArchitectureState(BaseModel):
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
     training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Learning', 'Full Training', or 'Fine-Tuning the whole model'")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
-
+    tflops_precision: str = Field(description="TFLOPS precision for the GPU")
 
 class TimeState(BaseModel):
     sample_count: int = Field(description="Number of samples in the dataset")
     input_size: Tuple = Field(description="Size of the input data")
     estimated_epochs: int = Field(description="Estimated number of epochs to train the model")
-    tflops_precision: str = Field(description="TFLOPS precision for the GPU")
 
 def ranking_node(state: MainState) -> MainState:
     messages = [
@@ -328,9 +331,10 @@ def ranking_node(state: MainState) -> MainState:
         eco_weight=response.eco_weight,
         time_weight=response.time_weight,
         cost_weight=response.cost_weight,
-        model_architecture="",
-        training_strategy="",
-        architecture_reasoning="",
+        model_architecture=state.model_architecture,
+        training_strategy=state.training_strategy,
+        architecture_reasoning=state.architecture_reasoning,
+        flops_precision=state.flops_precision,
         dataframe=state.dataframe,
         max_time=state.max_time,
         max_cost=state.max_cost,
@@ -382,6 +386,7 @@ def architecture_node(state: MainState) -> MainState:
         cost_weight=state.cost_weight,
         model_architecture=response.model_architecture,
         training_strategy=response.training_strategy,
+        flops_precision=response.tflops_precision,
         architecture_reasoning=response.architecture_reasoning,
         dataframe=state.dataframe,
         max_time=state.max_time,
@@ -405,7 +410,7 @@ def calculator_node(state: MainState) -> MainState:
     ]
     response = model.with_structured_output(TimeState).invoke(messages)
     print(response)
-    dataframe = recommend_gpu_configuration(model=state.model_architecture, input_size=response.input_size, training_strategy=state.training_strategy, sample_count=response.sample_count, estimated_epochs=response.estimated_epochs, time_coeff=state.time_weight, cost_coeff=state.cost_weight, co2_coeff=state.eco_weight, tflops_type=response.tflops_precision, max_time=state.max_time, max_cost=state.max_cost, max_co2=state.max_co2)
+    dataframe = recommend_gpu_configuration(model=state.model_architecture, input_size=response.input_size, training_strategy=state.training_strategy, sample_count=response.sample_count, estimated_epochs=response.estimated_epochs, time_coeff=state.time_weight, cost_coeff=state.cost_weight, co2_coeff=state.eco_weight, tflops_type=state.tflops_precision, max_time=state.max_time, max_cost=state.max_cost, max_co2=state.max_co2)
     return MainState(
         task=state.task,
         data=state.data,
@@ -419,6 +424,7 @@ def calculator_node(state: MainState) -> MainState:
         cost_weight=state.cost_weight,
         model_architecture=state.model_architecture,
         training_strategy=state.training_strategy,
+        flops_precision=state.flops_precision,
         architecture_reasoning=state.architecture_reasoning,
         dataframe=dataframe.to_dict() if not dataframe.empty else {},
         max_time=state.max_time,
@@ -466,6 +472,7 @@ for s in graph.stream(MainState(
     cost_weight=0.0,
     model_architecture="",
     training_strategy="",
+    flops_precision="",
     architecture_reasoning="",
     dataframe={},
     max_time=5,
