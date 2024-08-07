@@ -230,7 +230,7 @@ Provide:
    - "Full Training"
    - "Last Layer Learning"
 
-3. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Output a string "TFLOPS32" or "TFLOPS16".
+3. Choose between TFLOPS32 or TFLOPS16: Choose the appropriate TFLOPS value for the GPU based on the user priorities and constraints. Think if a user wants to save time, or to have better precision. Output a string "TFLOPS32" or "TFLOPS16".
 
 4. Reasoning: Explain why the chosen training strategy, model and the TFLOPS type is the best option considering the given constraints.
 
