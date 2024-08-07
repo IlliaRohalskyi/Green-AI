@@ -2,7 +2,7 @@ from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from langchain_core.messages.human import HumanMessage
 from langchain_core.messages.system import SystemMessage
 from langchain_core.pydantic_v1 import BaseModel, Field
-from langgraph.graph import StateGraph
+from langgraph.graph import StateGraph, END
 from langgraph.checkpoint.sqlite import SqliteSaver
 from typing import Tuple, List, Optional
 import pandas as pd
@@ -67,11 +67,13 @@ def estimate_flops(model: str, input_size: Tuple[int, int], training_strategy: s
         scaling = (input_size[0] * input_size[1]) / (width * height)
     else:
         scaling = input_size[0] / int(original_input_size)
-
+    
+    flops = int(model_info['FLOPs'].iloc[0])
+    last_layer_flops = int(model_info['Last Layer FLOPs'].iloc[0])
     if training_strategy in ["Fine-tuning the whole model", "Full Training"]:
-        return estimated_epochs * sample_count * model_info['FLOPs'].iloc[0] * scaling * 3
+        return estimated_epochs * sample_count * flops * scaling * 3
     elif training_strategy == "Last Layer Learning":
-        return estimated_epochs * sample_count * 2 * model_info['Last Layer FLOPs'].iloc[0] + model_info['FLOPs'].iloc[0] * scaling
+        return estimated_epochs * sample_count * (2 * last_layer_flops + flops * scaling)
     else:
         raise ValueError(f"Unsupported training strategy: {training_strategy}")
 
@@ -81,7 +83,7 @@ def estimate_time(flops: float, gpu: str, training_strategy: str, tflops: str, g
     if gpu_info.empty:
         raise ValueError(f"GPU {gpu} not found in the flops database")
     tflops_value = get_tflops_value(gpu_info.iloc[0], tflops)
-    return flops / tflops_value / 1e+12 if training_strategy in ["Full Training", "Fine-tuning the whole model"] else flops / tflops_value / 1e+12 / 3
+    return flops / tflops_value / 1e+12 
 
 
 def format_time(seconds):
@@ -133,7 +135,8 @@ def recommend_gpu_configuration(model, input_size, training_strategy, sample_cou
     pricing_df['Mapped_GPU'] = pricing_df['gpu'].map(manual_map).fillna(pricing_df['gpu'])
 
     total_flops = estimate_flops(model, input_size, training_strategy, sample_count, estimated_epochs, flops_df)
-
+    print("FLOPS:", total_flops)
+    print("#" * 50)
     results = []
 
     for _, price_row in pricing_df.iterrows():
@@ -228,9 +231,27 @@ Provide:
 2. Training strategy: Choose only one of the following options and explain your choice in the response. Think if the knowledge from the model could be transferred to the new task:
    - "Fine-tuning the whole model"
    - "Full Training"
-   - "Last Layer Tuning"
+   - "Last Layer Learning"
 
 3. Reasoning: Explain why the chosen training strategy and the model is the best option considering the given constraints.
+
+Respond with ONLY these three pieces of information, nothing else.
+"""
+
+SIMPLIFICATION_PROMPT = f"""
+You are an AI assistant specializing in recommending AI model architectures and training strategies. The previous recommendation didn't meet the constraints, so you need to propose a simpler architecture or strategy. Provide concise recommendations:
+
+Provide:
+
+1. Recommended model architecture: Provide only one of the following list: {get_all_models()}
+   Choose a simpler or smaller architecture compared to the previous recommendation.
+
+2. Training strategy: Choose only one of the following options and explain your choice in the response. Consider if a less computationally intensive strategy could be used:
+   - "Fine-tuning the whole model"
+   - "Full Training"
+   - "Last Layer Learning"
+
+3. Reasoning: Explain why the chosen training strategy and the model is a simpler option that might meet the constraints. Discuss how it differs from the previous recommendation and why it might be more suitable.
 
 Respond with ONLY these three pieces of information, nothing else.
 """
@@ -248,14 +269,14 @@ class MainState(BaseModel):
     cost_weight: float = Field(description="Ranking of cost efficiency")
     weight_reasoning: str = Field(description="Reasoning behind the chosen ranking")
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
-    training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Tuning', 'Full Training', or 'Fine-Tuning the whole model")
+    training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Learning', 'Full Training', or 'Fine-Tuning the whole model")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
-    recommended_gpu: str = Field(description="Recommended GPU for training the model")
-    gpu_reasoning: str = Field(description="Reasoning behind the chosen GPU recommendation")
+    dataframe: dict = Field(description="GPU and cloud data")
     max_time: Optional[float] = Field(description="Maximum time constraint")
     max_cost: Optional[float] = Field(description="Maximum cost constraint")
     max_co2: Optional[float] = Field(description="Maximum CO2 emissions constraint")
-
+    simplification_attempts: int = Field(default=0, description="Number of attempts to simplify the architecture")
+    constraints_met: bool = Field(default=True, description="Whether the constraints were met")
 
 class RankingState(BaseModel):
     eco_weight: float = Field(description="Ranking of eco-friendliness")
@@ -265,7 +286,7 @@ class RankingState(BaseModel):
 
 class ArchitectureState(BaseModel):
     model_architecture: str = Field(description="Recommended model architecture as a Hugging Face model name (organization/model-name)")
-    training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Tuning', 'Full Training', or 'Fine-Tuning the whole model'")
+    training_strategy: str = Field(description="Recommended training strategy: 'Last Layer Learning', 'Full Training', or 'Fine-Tuning the whole model'")
     architecture_reasoning: str = Field(description="Reasoning behind the chosen training strategy and model")
 
 
@@ -310,17 +331,16 @@ def ranking_node(state: MainState) -> MainState:
         model_architecture="",
         training_strategy="",
         architecture_reasoning="",
-        recommended_gpu="",
-        gpu_reasoning="",
+        dataframe=state.dataframe,
         max_time=state.max_time,
         max_cost=state.max_cost,
         max_co2=state.max_co2
     )
 
 def architecture_node(state: MainState) -> MainState:
-    messages = [
-        SystemMessage(content=ARCHITECTURE_PROMPT),
-        HumanMessage(content=f"""
+    if state.simplification_attempts == 0:
+        prompt = ARCHITECTURE_PROMPT
+        human_message = f"""
         Task: {state.task}
         Data: {state.data}
         Performance Needs: {state.performance_needs}
@@ -328,7 +348,25 @@ def architecture_node(state: MainState) -> MainState:
         Budget: {state.budget}
         Eco-friendliness: {state.eco_friendliness}
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
-        """)
+        """
+    else:
+        prompt = SIMPLIFICATION_PROMPT
+        human_message = f"""
+        Task: {state.task}
+        Data: {state.data}
+        Performance Needs: {state.performance_needs}
+        Time: {state.time}
+        Budget: {state.budget}
+        Eco-friendliness: {state.eco_friendliness}
+        Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
+        Simplification Attempts: {state.simplification_attempts}
+        Previous Architecture: {state.model_architecture}
+        Previous Strategy: {state.training_strategy}
+        """
+
+    messages = [
+        SystemMessage(content=prompt),
+        HumanMessage(content=human_message)
     ]
     response = model.with_structured_output(ArchitectureState).invoke(messages)
     return MainState(
@@ -345,13 +383,13 @@ def architecture_node(state: MainState) -> MainState:
         model_architecture=response.model_architecture,
         training_strategy=response.training_strategy,
         architecture_reasoning=response.architecture_reasoning,
-        recommended_gpu=state.recommended_gpu,
-        gpu_reasoning=state.gpu_reasoning,
+        dataframe=state.dataframe,
         max_time=state.max_time,
         max_cost=state.max_cost,
-        max_co2=state.max_co2
+        max_co2=state.max_co2,
+        simplification_attempts=state.simplification_attempts,
+        constraints_met=state.constraints_met
     )
-
 
 def calculator_node(state: MainState) -> MainState:
     messages = [
@@ -361,12 +399,13 @@ def calculator_node(state: MainState) -> MainState:
         Data: {state.data}
         Performance Needs: {state.performance_needs}
         Eco-friendliness: {state.eco_friendliness}
+        Model Architecture: {state.model_architecture}
         Priorities (Weights 0-1): Eco-friendly {state.eco_weight}, Time-efficient {state.time_weight}, Cost-efficient {state.cost_weight}
         """)
     ]
     response = model.with_structured_output(TimeState).invoke(messages)
+    print(response)
     dataframe = recommend_gpu_configuration(model=state.model_architecture, input_size=response.input_size, training_strategy=state.training_strategy, sample_count=response.sample_count, estimated_epochs=response.estimated_epochs, time_coeff=state.time_weight, cost_coeff=state.cost_weight, co2_coeff=state.eco_weight, tflops_type=response.tflops_precision, max_time=state.max_time, max_cost=state.max_cost, max_co2=state.max_co2)
-    print(dataframe.iloc[0])
     return MainState(
         task=state.task,
         data=state.data,
@@ -381,12 +420,16 @@ def calculator_node(state: MainState) -> MainState:
         model_architecture=state.model_architecture,
         training_strategy=state.training_strategy,
         architecture_reasoning=state.architecture_reasoning,
-        recommended_gpu=state.recommended_gpu,
-        gpu_reasoning=state.gpu_reasoning,
+        dataframe=dataframe.to_dict() if not dataframe.empty else {},
         max_time=state.max_time,
         max_cost=state.max_cost,
-        max_co2=state.max_co2
+        max_co2=state.max_co2,
+        simplification_attempts=state.simplification_attempts + 1 if dataframe.empty else state.simplification_attempts,
+        constraints_met=not dataframe.empty
     )
+
+def should_simplify(state: MainState):
+    return not state.constraints_met and state.simplification_attempts < 3
 
 
 builder = StateGraph(MainState)
@@ -398,6 +441,15 @@ builder.add_node("calculator", calculator_node)
 builder.set_entry_point("ranking")
 builder.add_edge("ranking", "architecturer")
 builder.add_edge("architecturer", "calculator")
+builder.add_conditional_edges(
+    "calculator",
+    should_simplify,
+    {
+        True: "architecturer",
+        False: END
+    }
+)
+
 graph = builder.compile(checkpointer=memory)
 
 thread = {"configurable": {"thread_id": "1"}}
@@ -415,10 +467,12 @@ for s in graph.stream(MainState(
     model_architecture="",
     training_strategy="",
     architecture_reasoning="",
-    recommended_gpu="",
-    gpu_reasoning="",
-    max_time=None,
+    dataframe={},
+    max_time=5,
     max_cost=None,
     max_co2=None,
+    simplification_attempts=0,
+    constraints_met=True
 ), thread):
     print(s)
+
