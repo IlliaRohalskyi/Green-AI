@@ -11,7 +11,7 @@ class DocumentLoader:
         chunks = []
         for filename in os.listdir(directory):
             if filename.endswith(".txt"):
-                with open(os.path.join(directory, filename), 'r') as file:
+                with open(os.path.join(directory, filename), 'r', encoding='utf-8') as file:
                     content = file.read()
                     sentences = sent_tokenize(content)
                     current_chunk = []
