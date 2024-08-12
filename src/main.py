@@ -65,10 +65,11 @@ def main():
         ),
         thread,
     ):
-            if len(s) == 1:
-                node_key = next(iter(s))
-                node_response = s[node_key]
-                print(node_response['max_time'])
+        pass        
+    if len(s) == 1:
+        node_key = next(iter(s))
+        node_response = s[node_key]
+        print(node_response['dataframe'])
 
 
 
