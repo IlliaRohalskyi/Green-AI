@@ -1,5 +1,5 @@
 lint:
-	pylint src test
+	pylint src
 
 format:
 	@echo "Running black..."

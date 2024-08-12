@@ -18,7 +18,7 @@ matplotlib
 openpyxl
 ollama
 plotly
-PuLP
+pylint
 qdrant-client
 nbformat
 seaborn
