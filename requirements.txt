@@ -4,10 +4,10 @@ bs4
 dvc_s3
 calflops
 isort
-langchain
+langchain==0.2.9
 langchain_community
 langchain-experimental
-langgraph
+langgraph==0.1.8
 pandas
 pymupdf
 pyyaml
