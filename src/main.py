@@ -42,7 +42,6 @@ def main():
             task="I want to build a computer vision model that detects cars in images.",
             data=(
                 "I have a dataset of 1 million car images labeled with their bounding boxes. "
-                "(Images resized to 256x256 pixels for efficiency)"
             ),
             performance_needs="The model should achieve best accuracy.",
             time="I have few days to train the model.",
@@ -65,7 +64,7 @@ def main():
         ),
         thread,
     ):
-        pass        
+        print(s)        
     if len(s) == 1:
         node_key = next(iter(s))
         node_response = s[node_key]
