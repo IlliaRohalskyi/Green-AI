@@ -2,7 +2,7 @@ from typing import List
 from src.logger import logging
 import pandas as pd
 
-from config import MODEL_FLOPS_PATH
+from src.config import MODEL_FLOPS_PATH
 
 
 def get_all_models() -> List[str]:

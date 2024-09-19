@@ -1,4 +1,4 @@
-from typing import Optional, Tuple
+from typing import Optional, List
 
 from langchain_core.pydantic_v1 import BaseModel, Field
 
@@ -58,7 +58,7 @@ class ArchitectureState(BaseModel):
 
 class TimeState(BaseModel):
     sample_count: int = Field(description="Number of samples in the dataset")
-    input_size: Tuple = Field(description="Size of the input data")
+    input_size: List = Field(description="Size of the input data")
     estimated_epochs: int = Field(
         description="Estimated number of epochs to train the model"
     )

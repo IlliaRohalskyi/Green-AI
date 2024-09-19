@@ -1,9 +1,13 @@
+from src.utils.data_processing import get_all_models
+
+
 ARCHITECTURE_PROMPT = f"""
 You are an AI assistant specializing in recommending AI model architectures and training strategies. Provide concise recommendations:
 
 Provide:
 
-1. Recommended model architecture: Provide only one of the following list: {{get_all_models()}}
+1. Recommended model architecture: Provide only one of the following list: {get_all_models()}
+
 
 2. Training strategy: Choose only one of the following options and explain your choice in the response. Think if the knowledge from the model could be transferred to the new task:
    - "Fine-tuning the whole model"

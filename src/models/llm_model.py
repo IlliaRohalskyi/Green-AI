@@ -1,7 +1,7 @@
 from langchain_experimental.llms.ollama_functions import OllamaFunctions
 from src.logger import logging
 
-from config import LLM_MODEL, LLM_TEMPERATURE, LLM_TOP_P
+from src.config import LLM_MODEL, LLM_TEMPERATURE, LLM_TOP_P
 
 
 def get_llm_model():

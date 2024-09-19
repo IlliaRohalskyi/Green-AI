@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bewertungssystem</title>
+    <style>
+        table, th, td {
+            border: 1px solid black;
+            border-collapse: collapse;
+            padding: 8px;
+            text-align: center;
+        }
+        th {
+            background-color: #f2f2f2;
+        }
+    </style>
+</head>
+<body>
+    <h1>Bewertungssystem</h1>
+
+    <form method="POST">
+        <input type="text" name="input1" placeholder="Geben Sie die Aufgabe ein" required>
+        <input type="text" name="input2" placeholder="Geben Sie die Daten ein" required>
+        <input type="text" name="input3" placeholder="Leistungsanforderungen" required>
+        <input type="text" name="input4" placeholder="Verfügbare Zeit" required>
+        <input type="text" name="input5" placeholder="Budget" required>
+        <input type="text" name="input6" placeholder="Umweltfreundlichkeit" required>
+        <button type="submit">Bewertung berechnen</button>
+    </form>
+
+    {% if result_data %}
+        <h2>Ergebnisse</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>Index</th>
+                    <th>GPU</th>
+                    <th>Mapped GPU</th>
+                    <th>Region</th>
+                    <th>Time (formatted)</th>
+                    <th>Cost ($)</th>
+                    <th>CO2 (kg)</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for idx in result_data['GPU'].keys() %}
+                <tr>
+                    <td>{{ idx }}</td>
+                    <td>{{ result_data['GPU'][idx] }}</td>
+                    <td>{{ result_data['Mapped_GPU'][idx] }}</td>
+                    <td>{{ result_data['Region'][idx] }}</td>
+                    <td>{{ result_data['Time (formatted)'][idx] }}</td>
+                    <td>{{ result_data['Cost ($)'][idx]|round(2) }}</td>
+                    <td>{{ result_data['CO2 (kg)'][idx]|round(2) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+</body>
+</html>
