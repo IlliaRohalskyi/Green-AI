@@ -1,51 +1,109 @@
+/* Allgemeine Stile */
 body {
-    font-family: Arial, sans-serif;
-    margin: 20px;
-}
-
-h1 {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #f4f4f9;
     color: #333;
 }
 
+header {
+    background-color: #4CAF50;
+    padding: 20px;
+    text-align: center;
+}
+
+header h1 {
+    color: white;
+    font-size: 2.5em;
+}
+
+main {
+    width: 90%;
+    max-width: 1200px;
+    margin: 20px auto;
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Formular Stile */
 form {
-    margin-bottom: 20px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
 }
 
-label {
-    display: block;
-    margin: 5px 0;
+form label {
+    font-weight: bold;
+    margin-bottom: 5px;
 }
 
-input {
-    margin-bottom: 10px;
-    padding: 5px;
-    width: 300px;
+form input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #ccc;
 }
 
-button {
-    padding: 10px 15px;
+form input[type="checkbox"] {
+    margin-left: 10px;
+}
+
+form button {
+    grid-column: span 2;
+    padding: 10px 20px;
     background-color: #4CAF50;
     color: white;
     border: none;
+    border-radius: 5px;
+    font-size: 1.1em;
     cursor: pointer;
 }
 
-button:hover {
+form button:hover {
     background-color: #45a049;
 }
 
+/* Tabellen Stile */
 table {
     width: 100%;
     border-collapse: collapse;
     margin-top: 20px;
 }
 
-th, td {
-    padding: 10px;
-    border: 1px solid #ddd;
-    text-align: left;
+table thead {
+    background-color: #4CAF50;
+    color: white;
 }
 
-th {
-    background-color: #f2f2f2;
+table th, table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+table tbody tr:hover {
+    background-color: #f1f1f1;
+}
+
+/* Sterne Bewertung */
+.stars {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.full-star, .half-star, .empty-star {
+    font-size: 1.5em;
+    color: #FFD700;
+    margin-left: 5px;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    background-color: #f4f4f9;
+    color: #666;
+    margin-top: 20px;
 }

@@ -15,16 +15,35 @@ def home():
         # Hole die Formulareingaben
         task = request.form.get("input1")
         data = request.form.get("input2")
+
+        # Überprüfe, ob die Checkbox für Performance aktiviert ist
         performance_needs = request.form.get("input3")
+        if request.form.get("performance_important"):
+            performance_needs = "this is not important for me"
+
+        # Überprüfe, ob die Checkbox für Time aktiviert ist
         time = request.form.get("input4")
+        if request.form.get("time_important"):
+            time = "this is not important for me"
+
+        # Überprüfe, ob die Checkbox für Budget aktiviert ist
         budget = request.form.get("input5")
+        if request.form.get("budget_important"):
+            budget = "this is not important for me"
+
+        # Überprüfe, ob die Checkbox für Eco Friendliness aktiviert ist
         eco_friendliness = request.form.get("input6")
+        if request.form.get("eco_important"):
+            eco_friendliness = "this is not important for me"
 
         # Übergib die Eingaben an main und hole das Ergebnis
-        result = main(task, data, performance_needs, time, budget, eco_friendliness)
-
-        # Die Ausgabe der main.py ist im JSON-Format. Um sie im HTML darzustellen, geben wir sie direkt als Text zurück
-        result_data = json.loads(result)
+        try:
+            result = main(task, data, performance_needs, time, budget, eco_friendliness)
+            result_data = json.loads(result)
+        except Exception as e:
+            # Fehlerbehandlung
+            return render_template("form.html", error=f"Error: {str(e)}")
+        
         return render_template("form.html", result_data=result_data)
     
     return render_template("form.html")

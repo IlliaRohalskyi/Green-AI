@@ -3,60 +3,100 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bewertungssystem</title>
-    <style>
-        table, th, td {
-            border: 1px solid black;
-            border-collapse: collapse;
-            padding: 8px;
-            text-align: center;
-        }
-        th {
-            background-color: #f2f2f2;
-        }
-    </style>
+    <title>GreenAI - Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-    <h1>Bewertungssystem</h1>
+    <header>
+        <h1>GreenAI</h1>
+    </header>
 
-    <form method="POST">
-        <input type="text" name="input1" placeholder="Geben Sie die Aufgabe ein" required>
-        <input type="text" name="input2" placeholder="Geben Sie die Daten ein" required>
-        <input type="text" name="input3" placeholder="Leistungsanforderungen" required>
-        <input type="text" name="input4" placeholder="Verfügbare Zeit" required>
-        <input type="text" name="input5" placeholder="Budget" required>
-        <input type="text" name="input6" placeholder="Umweltfreundlichkeit" required>
-        <button type="submit">Bewertung berechnen</button>
-    </form>
+    <main>
+        <form method="POST">
+            <label for="input1">Task:</label>
+            <input type="text" id="input1" name="input1" required>
 
-    {% if result_data %}
-        <h2>Ergebnisse</h2>
+            <label for="input2">Data:</label>
+            <input type="text" id="input2" name="input2" required>
+
+            <label for="input3">Performance Needs:</label>
+            <div>
+                <input type="text" id="input3" name="input3">
+                <input type="checkbox" id="performance_important" name="performance_important" value="this is not important for me">
+                <label for="performance_important">Not important</label>
+            </div>
+
+            <label for="input4">Time:</label>
+            <div>
+                <input type="text" id="input4" name="input4">
+                <input type="checkbox" id="time_important" name="time_important" value="this is not important for me">
+                <label for="time_important">Not important</label>
+            </div>
+
+            <label for="input5">Budget:</label>
+            <div>
+                <input type="text" id="input5" name="input5">
+                <input type="checkbox" id="budget_important" name="budget_important" value="this is not important for me">
+                <label for="budget_important">Not important</label>
+            </div>
+
+            <label for="input6">Eco Friendliness:</label>
+            <div>
+                <input type="text" id="input6" name="input6">
+                <input type="checkbox" id="eco_important" name="eco_important" value="this is not important for me">
+                <label for="eco_important">Not important</label>
+            </div>
+
+            <button type="submit">Submit</button>
+        </form>
+
+        {% if result_data %}
+        <h2>Results</h2>
         <table>
             <thead>
                 <tr>
-                    <th>Index</th>
                     <th>GPU</th>
-                    <th>Mapped GPU</th>
-                    <th>Region</th>
-                    <th>Time (formatted)</th>
-                    <th>Cost ($)</th>
                     <th>CO2 (kg)</th>
+                    <th>Cost ($)</th>
+                    <th>Region</th>
+                    <th>Time</th>
+                    <th>Time (formatted)</th>
+                    <th>CO2 Score</th>
                 </tr>
             </thead>
             <tbody>
                 {% for idx in result_data['GPU'].keys() %}
                 <tr>
-                    <td>{{ idx }}</td>
                     <td>{{ result_data['GPU'][idx] }}</td>
-                    <td>{{ result_data['Mapped_GPU'][idx] }}</td>
+                    <td>{{ result_data['CO2 (kg)'][idx] | round(2) }}</td>
+                    <td>{{ result_data['Cost ($)'][idx] | round(2) }}</td>
                     <td>{{ result_data['Region'][idx] }}</td>
+                    <td>{{ result_data['Time'][idx] | round(2) }}</td>
                     <td>{{ result_data['Time (formatted)'][idx] }}</td>
-                    <td>{{ result_data['Cost ($)'][idx]|round(2) }}</td>
-                    <td>{{ result_data['CO2 (kg)'][idx]|round(2) }}</td>
+                    <td>
+                        <div class="stars">
+                            {% set score = result_data['CO2 (kg)_Score'][idx] %}
+                            {% set rounded_score = (score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
-    {% endif %}
+        {% endif %}
+    </main>
+
+    <footer>
+        <p>&copy; 2024 GreenAI. All rights reserved.</p>
+    </footer>
 </body>
 </html>
