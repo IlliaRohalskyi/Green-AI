@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenAI - Ergebnisse</title>
+    <title>GreenAI - Results</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
@@ -16,60 +16,60 @@
 
     <main>
         <form method="POST">
-            <label for="input1">Aufgabe:</label>
-            <input type="text" id="input1" name="input1" placeholder="Z.B.: Ein Modell zum Erkennen von Autos erstellen" required>
+            <label for="input1">Task:</label>
+            <input type="text" id="input1" name="input1" placeholder="E.g., Build a model to detect cars in images" required>
 
-            <label for="input2">Daten:</label>
-            <input type="text" id="input2" name="input2" placeholder="Z.B.: 1 Million Bilder von Autos mit Markierungen" required>
+            <label for="input2">Data:</label>
+            <input type="text" id="input2" name="input2" placeholder="E.g., 1 million images of cars with bounding boxes" required>
 
-            <label for="input3">Performance-Anforderungen:</label>
+            <label for="input3">Performance Needs:</label>
             <div>
-                <input type="text" id="input3" name="input3" placeholder="Z.B.: Hohe Genauigkeit erforderlich">
+                <input type="text" id="input3" name="input3" placeholder="High accuracy required">
                 <input type="checkbox" id="performance_important" name="performance_important" value="this is not important for me">
-                <label for="performance_important">Nicht wichtig</label>
+                <label for="performance_important">Not important</label>
             </div>
 
-            <label for="input4">Zeit:</label>
+            <label for="input4">Time:</label>
             <div>
-                <input type="text" id="input4" name="input4" placeholder="Z.B.: Wenige Tage zur Modell-Training">
+                <input type="text" id="input4" name="input4" placeholder="Few days to train the model">
                 <input type="checkbox" id="time_important" name="time_important" value="this is not important for me">
-                <label for="time_important">Nicht wichtig</label>
+                <label for="time_important">Not important</label>
             </div>
 
             <label for="input5">Budget:</label>
             <div>
-                <input type="text" id="input5" name="input5" placeholder="Minimale Kosten, aber nicht kritisch">
+                <input type="text" id="input5" name="input5" placeholder="Minimize costs, but not critical">
                 <input type="checkbox" id="budget_important" name="budget_important" value="this is not important for me">
-                <label for="budget_important">Nicht wichtig</label>
+                <label for="budget_important">Not important</label>
             </div>
 
-            <label for="input6">Umweltfreundlichkeit:</label>
+            <label for="input6">Eco Friendliness:</label>
             <div>
-                <input type="text" id="input6" name="input6" placeholder="Keine Bedenken zur Umweltfreundlichkeit">
+                <input type="text" id="input6" name="input6" placeholder="No eco-friendliness concerns">
                 <input type="checkbox" id="eco_important" name="eco_important" value="this is not important for me">
-                <label for="eco_important">Nicht wichtig</label>
+                <label for="eco_important">Not important</label>
             </div>
 
-            <button type="submit">Absenden</button>
+            <button type="submit">Submit</button>
         </form>
 
         {% if result_data %}
-        <h2>Projektübersicht</h2>
-        <p><strong>Gewichtungsbegründung:</strong> {{ weight_reasoning }}</p>
-        <p><strong>Modellarchitektur:</strong> {{ model_architecture }}</p>
-        <p><strong>Trainingsstrategie:</strong> {{ training_strategy }}</p>
-        <p><strong>Architekturbegründung:</strong> {{ architecture_reasoning }}</p>
+        <h2>Project Overview</h2>
+        <p><strong>Weight Reasoning:</strong> {{ weight_reasoning }}</p>
+        <p><strong>Model Architecture:</strong> {{ model_architecture }}</p>
+        <p><strong>Training Strategy:</strong> {{ training_strategy }}</p>
+        <p><strong>Architecture Reasoning:</strong> {{ architecture_reasoning }}</p>
 
-        <h2>Ergebnisse</h2>
+        <h2>Results</h2>
         <table>
             <thead>
                 <tr>
                     <th>GPU</th>
                     <th>CO2 (kg)</th>
-                    <th>Kosten ($)</th>
+                    <th>Cost ($)</th>
                     <th>Region</th>
-                    <th>Formattierte Zeit</th>
-                    <th>CO2-Bewertung</th>
+                    <th>Time (formatted)</th>
+                    <th>CO2 Score</th>
                 </tr>
             </thead>
             <tbody>
@@ -103,7 +103,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2024 GreenAI. Alle Rechte vorbehalten.</p>
+        <p>&copy; 2024 GreenAI. All rights reserved.</p>
     </footer>
 </body>
 </html>

@@ -1,9 +1,9 @@
 from flask import Flask, render_template, request
-from src.main import main  # Importiere die main Funktion aus main.py
+from src.main import main  # Import the main function from main.py
 import os
 import json
 
-# Absoluter Pfad zum Templates-Verzeichnis
+# Absolute path to the templates and static directory
 template_dir = os.path.abspath('src/webapp/templates')
 static_dir = os.path.abspath('src/webapp/static')
 
@@ -12,44 +12,44 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
-        # Hole die Formulareingaben
+        # Get form inputs
         task = request.form.get("input1")
         data = request.form.get("input2")
 
-        # Überprüfe, ob die Checkbox für Performance aktiviert ist
+        # Check if the checkbox for Performance is checked
         performance_needs = request.form.get("input3")
         if request.form.get("performance_important"):
             performance_needs = "this is not important for me"
 
-        # Überprüfe, ob die Checkbox für Time aktiviert ist
+        # Check if the checkbox for Time is checked
         time = request.form.get("input4")
         if request.form.get("time_important"):
             time = "this is not important for me"
 
-        # Überprüfe, ob die Checkbox für Budget aktiviert ist
+        # Check if the checkbox for Budget is checked
         budget = request.form.get("input5")
         if request.form.get("budget_important"):
             budget = "this is not important for me"
 
-        # Überprüfe, ob die Checkbox für Eco Friendliness aktiviert ist
+        # Check if the checkbox for Eco Friendliness is checked
         eco_friendliness = request.form.get("input6")
         if request.form.get("eco_important"):
             eco_friendliness = "this is not important for me"
 
-        # Übergib die Eingaben an main und hole das Ergebnis
+        # Pass inputs to main and get the result
         try:
             result = main(task, data, performance_needs, time, budget, eco_friendliness)
             result_data = json.loads(result)
 
-            # Zugriff auf verschachtelte Felder im `architecturer` oder `calculator`
+            # Access nested fields from `architecturer` or `calculator`
             architecturer_data = result_data.get('architecturer', {})
-            weight_reasoning = architecturer_data.get('weight_reasoning', 'Kein Eintrag')
-            model_architecture = architecturer_data.get('model_architecture', 'Kein Eintrag')
-            training_strategy = architecturer_data.get('training_strategy', 'Kein Eintrag')
-            architecture_reasoning = architecturer_data.get('architecture_reasoning', 'Kein Eintrag')
+            weight_reasoning = architecturer_data.get('weight_reasoning', 'No entry')
+            model_architecture = architecturer_data.get('model_architecture', 'No entry')
+            training_strategy = architecturer_data.get('training_strategy', 'No entry')
+            architecture_reasoning = architecturer_data.get('architecture_reasoning', 'No entry')
         
         except Exception as e:
-            # Fehlerbehandlung
+            # Error handling
             return render_template("form.html", error=f"Error: {str(e)}")
         
         return render_template("form.html", 
