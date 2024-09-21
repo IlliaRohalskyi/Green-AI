@@ -1,67 +1,75 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>GreenAI - Results</title>
+    <title>GreenAI - Ergebnisse</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <header>
-        <h1>GreenAI</h1>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="GreenAI Logo">
+            <h1 class="greenai-title">GreenAI</h1>
+        </div>
     </header>
 
     <main>
         <form method="POST">
-            <label for="input1">Task:</label>
-            <input type="text" id="input1" name="input1" required>
+            <label for="input1">Aufgabe:</label>
+            <input type="text" id="input1" name="input1" placeholder="Z.B.: Ein Modell zum Erkennen von Autos erstellen" required>
 
-            <label for="input2">Data:</label>
-            <input type="text" id="input2" name="input2" required>
+            <label for="input2">Daten:</label>
+            <input type="text" id="input2" name="input2" placeholder="Z.B.: 1 Million Bilder von Autos mit Markierungen" required>
 
-            <label for="input3">Performance Needs:</label>
+            <label for="input3">Performance-Anforderungen:</label>
             <div>
-                <input type="text" id="input3" name="input3">
+                <input type="text" id="input3" name="input3" placeholder="Z.B.: Hohe Genauigkeit erforderlich">
                 <input type="checkbox" id="performance_important" name="performance_important" value="this is not important for me">
-                <label for="performance_important">Not important</label>
+                <label for="performance_important">Nicht wichtig</label>
             </div>
 
-            <label for="input4">Time:</label>
+            <label for="input4">Zeit:</label>
             <div>
-                <input type="text" id="input4" name="input4">
+                <input type="text" id="input4" name="input4" placeholder="Z.B.: Wenige Tage zur Modell-Training">
                 <input type="checkbox" id="time_important" name="time_important" value="this is not important for me">
-                <label for="time_important">Not important</label>
+                <label for="time_important">Nicht wichtig</label>
             </div>
 
             <label for="input5">Budget:</label>
             <div>
-                <input type="text" id="input5" name="input5">
+                <input type="text" id="input5" name="input5" placeholder="Minimale Kosten, aber nicht kritisch">
                 <input type="checkbox" id="budget_important" name="budget_important" value="this is not important for me">
-                <label for="budget_important">Not important</label>
+                <label for="budget_important">Nicht wichtig</label>
             </div>
 
-            <label for="input6">Eco Friendliness:</label>
+            <label for="input6">Umweltfreundlichkeit:</label>
             <div>
-                <input type="text" id="input6" name="input6">
+                <input type="text" id="input6" name="input6" placeholder="Keine Bedenken zur Umweltfreundlichkeit">
                 <input type="checkbox" id="eco_important" name="eco_important" value="this is not important for me">
-                <label for="eco_important">Not important</label>
+                <label for="eco_important">Nicht wichtig</label>
             </div>
 
-            <button type="submit">Submit</button>
+            <button type="submit">Absenden</button>
         </form>
 
         {% if result_data %}
-        <h2>Results</h2>
+        <h2>Projektübersicht</h2>
+        <p><strong>Gewichtungsbegründung:</strong> {{ weight_reasoning }}</p>
+        <p><strong>Modellarchitektur:</strong> {{ model_architecture }}</p>
+        <p><strong>Trainingsstrategie:</strong> {{ training_strategy }}</p>
+        <p><strong>Architekturbegründung:</strong> {{ architecture_reasoning }}</p>
+
+        <h2>Ergebnisse</h2>
         <table>
             <thead>
                 <tr>
                     <th>GPU</th>
                     <th>CO2 (kg)</th>
-                    <th>Cost ($)</th>
+                    <th>Kosten ($)</th>
                     <th>Region</th>
-                    <th>Time</th>
-                    <th>Time (formatted)</th>
-                    <th>CO2 Score</th>
+                    <th>Formattierte Zeit</th>
+                    <th>CO2-Bewertung</th>
                 </tr>
             </thead>
             <tbody>
@@ -71,7 +79,6 @@
                     <td>{{ result_data['CO2 (kg)'][idx] | round(2) }}</td>
                     <td>{{ result_data['Cost ($)'][idx] | round(2) }}</td>
                     <td>{{ result_data['Region'][idx] }}</td>
-                    <td>{{ result_data['Time'][idx] | round(2) }}</td>
                     <td>{{ result_data['Time (formatted)'][idx] }}</td>
                     <td>
                         <div class="stars">
@@ -96,7 +103,7 @@
     </main>
 
     <footer>
-        <p>&copy; 2024 GreenAI. All rights reserved.</p>
+        <p>&copy; 2024 GreenAI. Alle Rechte vorbehalten.</p>
     </footer>
 </body>
 </html>

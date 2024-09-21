@@ -40,11 +40,24 @@ def home():
         try:
             result = main(task, data, performance_needs, time, budget, eco_friendliness)
             result_data = json.loads(result)
+
+            # Zugriff auf verschachtelte Felder im `architecturer` oder `calculator`
+            architecturer_data = result_data.get('architecturer', {})
+            weight_reasoning = architecturer_data.get('weight_reasoning', 'Kein Eintrag')
+            model_architecture = architecturer_data.get('model_architecture', 'Kein Eintrag')
+            training_strategy = architecturer_data.get('training_strategy', 'Kein Eintrag')
+            architecture_reasoning = architecturer_data.get('architecture_reasoning', 'Kein Eintrag')
+        
         except Exception as e:
             # Fehlerbehandlung
             return render_template("form.html", error=f"Error: {str(e)}")
         
-        return render_template("form.html", result_data=result_data)
+        return render_template("form.html", 
+                               result_data=result_data,
+                               weight_reasoning=weight_reasoning,
+                               model_architecture=model_architecture,
+                               training_strategy=training_strategy,
+                               architecture_reasoning=architecture_reasoning)
     
     return render_template("form.html")
 
