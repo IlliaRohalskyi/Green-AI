@@ -1,4 +1,4 @@
-/* Allgemeine Stile */
+/* General styles */
 body {
     font-family: 'Arial', sans-serif;
     margin: 0;
@@ -29,7 +29,7 @@ header {
     font-size: 2.5em;
 }
 
-/* Hauptinhalt */
+/* Main content */
 main {
     width: 90%;
     max-width: 1200px;
@@ -40,7 +40,7 @@ main {
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
-/* Formular Stile */
+/* Form styles */
 form {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -81,7 +81,7 @@ form button:hover {
     background-color: #45a049;
 }
 
-/* Tabellen Stile */
+/* Table styles */
 table {
     width: 100%;
     border-collapse: collapse;
@@ -103,7 +103,7 @@ table tbody tr:hover {
     background-color: #444;
 }
 
-/* Sterne Bewertung */
+/* Star rating styles */
 .stars {
     display: flex;
     justify-content: flex-end;

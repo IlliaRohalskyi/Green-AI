@@ -50,15 +50,25 @@
                 <label for="eco_important">Not important</label>
             </div>
 
+            <!-- New fields for Maximum Time, Cost, and CO2 -->
+            <label for="max_time">Maximum Time (e.g., 1 week):</label>
+            <input type="text" id="max_time" name="max_time" placeholder="Optional">
+
+            <label for="max_cost">Maximum Cost (e.g., 1000 USD):</label>
+            <input type="text" id="max_cost" name="max_cost" placeholder="Optional">
+
+            <label for="max_co2">Maximum CO2 (e.g., 50 kg):</label>
+            <input type="text" id="max_co2" name="max_co2" placeholder="Optional">
+
             <button type="submit">Submit</button>
         </form>
 
         {% if result_data %}
         <h2>Project Overview</h2>
-        <p><strong>Weight Reasoning:</strong> {{ weight_reasoning }}</p>
-        <p><strong>Model Architecture:</strong> {{ model_architecture }}</p>
-        <p><strong>Training Strategy:</strong> {{ training_strategy }}</p>
-        <p><strong>Architecture Reasoning:</strong> {{ architecture_reasoning }}</p>
+        <p><strong>Weight Reasoning:</strong> {{ result_data['weight_reasoning'] }}</p>
+        <p><strong>Model Architecture:</strong> {{ result_data['model_architecture'] }}</p>
+        <p><strong>Training Strategy:</strong> {{ result_data['training_strategy'] }}</p>
+        <p><strong>Architecture Reasoning:</strong> {{ result_data['architecture_reasoning'] }}</p>
 
         <h2>Results</h2>
         <table>
