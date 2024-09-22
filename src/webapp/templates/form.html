@@ -50,15 +50,15 @@
                 <label for="eco_important">Not important</label>
             </div>
 
-            <!-- New fields for Maximum Time, Cost, and CO2 -->
-            <label for="max_time">Maximum Time (e.g., 1 week):</label>
-            <input type="text" id="max_time" name="max_time" placeholder="Optional">
+            <!-- Additional Fields for Max Time, Max Cost, Max CO2 -->
+            <label for="input_max_time">Maximum Time:</label>
+            <input type="text" id="input_max_time" name="input_max_time" placeholder="Maximum training time (e.g., 10 days)">
 
-            <label for="max_cost">Maximum Cost (e.g., 1000 USD):</label>
-            <input type="text" id="max_cost" name="max_cost" placeholder="Optional">
+            <label for="input_max_cost">Maximum Cost:</label>
+            <input type="text" id="input_max_cost" name="input_max_cost" placeholder="Maximum budget (e.g., 5000 USD)">
 
-            <label for="max_co2">Maximum CO2 (e.g., 50 kg):</label>
-            <input type="text" id="max_co2" name="max_co2" placeholder="Optional">
+            <label for="input_max_co2">Maximum CO2:</label>
+            <input type="text" id="input_max_co2" name="input_max_co2" placeholder="Maximum CO2 emissions (e.g., 50 kg)">
 
             <button type="submit">Submit</button>
         </form>
@@ -78,8 +78,11 @@
                     <th>CO2 (kg)</th>
                     <th>Cost ($)</th>
                     <th>Region</th>
-                    <th>Time (formatted)</th>
+                    <th>Time</th>
                     <th>CO2 Score</th>
+                    <th>Time Score</th>
+                    <th>Cost Score</th>
+                    <th>Overall Score</th>
                 </tr>
             </thead>
             <tbody>
@@ -91,13 +94,58 @@
                     <td>{{ result_data['Region'][idx] }}</td>
                     <td>{{ result_data['Time (formatted)'][idx] }}</td>
                     <td>
-                        <div class="stars">
+                        <div class="stars-small" title="{{ result_data['CO2 (kg)_Score'][idx] | round(2) }}">
                             {% set score = result_data['CO2 (kg)_Score'][idx] %}
                             {% set rounded_score = (score * 2) | round / 2 %}
                             {% for i in range(5) %}
                                 {% if rounded_score >= i + 1 %}
                                     <span class="full-star">&#9733;</span>
                                 {% elif rounded_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars-small" title="{{ result_data['Time_Score'][idx] | round(2) }}">
+                            {% set time_score = result_data['Time_Score'][idx] %}
+                            {% set rounded_time_score = (time_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_time_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_time_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars-small" title="{{ result_data['Cost ($)_Score'][idx] | round(2) }}">
+                            {% set cost_score = result_data['Cost ($)_Score'][idx] %}
+                            {% set rounded_cost_score = (cost_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_cost_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_cost_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars" title="{{ result_data['Ranking'][idx] | round(2) }}">
+                            {% set overall_score = result_data['Ranking'][idx] %}
+                            {% set rounded_overall_score = (overall_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_overall_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_overall_score >= i + 0.5 %}
                                     <span class="half-star">&#9733;</span>
                                 {% else %}
                                     <span class="empty-star">&#9734;</span>
