@@ -12,33 +12,52 @@ app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
 @app.route("/", methods=["GET", "POST"])
 def home():
     if request.method == "POST":
-        # Capture the new inputs
-        max_time = request.form.get("max_time")
-        max_cost = request.form.get("max_cost")
-        max_co2 = request.form.get("max_co2")
-        
-        # If the user didn't input anything, use the defaults
-        max_time = float(max_time) if max_time else 1e19
-        max_cost = float(max_cost) if max_cost else None
-        max_co2 = float(max_co2) if max_co2 else None
-
-        # Capture other inputs and process them as before
+        # Get the form inputs
         task = request.form.get("input1")
         data = request.form.get("input2")
-        performance_needs = request.form.get("input3") if not request.form.get("performance_important") else "this is not important for me"
-        time = request.form.get("input4") if not request.form.get("time_important") else "this is not important for me"
-        budget = request.form.get("input5") if not request.form.get("budget_important") else "this is not important for me"
-        eco_friendliness = request.form.get("input6") if not request.form.get("eco_important") else "this is not important for me"
+        performance_needs = request.form.get("input3")
+        time = request.form.get("input4")
+        budget = request.form.get("input5")
+        eco_friendliness = request.form.get("input6")
+        max_time = float(request.form.get("input_max_time", 1e19)) if request.form.get("input_max_time") else 1e19
+        max_cost = float(request.form.get("input_max_cost", None)) if request.form.get("input_max_cost") else None
+        max_co2 = float(request.form.get("input_max_co2", None)) if request.form.get("input_max_co2") else None
 
-        # Pass the inputs to the main function including max_time, max_cost, and max_co2
-        try:
-            result = main(task, data, performance_needs, time, budget, eco_friendliness, max_time=max_time, max_cost=max_cost, max_co2=max_co2)
-            result_data = json.loads(result)
-        except Exception as e:
-            return render_template("form.html", error=f"Error: {str(e)}")
-        
-        return render_template("form.html", result_data=result_data)
+
+        # Process 'Not Important' checkboxes
+        if request.form.get("performance_important"):
+            performance_needs = "This is not important for me"
+        if request.form.get("time_important"):
+            time = "This is not important for me"
+        if request.form.get("budget_important"):
+            budget = "This is not important for me"
+        if request.form.get("eco_important"):
+            eco_friendliness = "This is not important for me"
+
+        print(f"Task: {task}, Data: {data}, Performance Needs: {performance_needs}, Time: {time}, Budget: {budget}, Eco Friendliness: {eco_friendliness}, Max Time: {max_time}, Max Cost: {max_cost}, Max CO2: {max_co2}")
     
+
+        # Call main function and get the results
+        try:
+            result_json, weight_reasoning, model_architecture, training_strategy, architecture_reasoning = main(
+                task, data, performance_needs, time, budget, eco_friendliness,
+                max_time=max_time, max_cost=max_cost, max_co2=max_co2
+            )
+            result_data = json.loads(result_json)
+        except Exception as e:
+            # Error handling
+            return render_template("form.html", error=f"Error: {str(e)}")
+
+        # Pass all the necessary data to the template
+        return render_template(
+            "form.html",
+            result_data=result_data,
+            weight_reasoning=weight_reasoning,
+            model_architecture=model_architecture,
+            training_strategy=training_strategy,
+            architecture_reasoning=architecture_reasoning
+        )
+
     return render_template("form.html")
 
 if __name__ == "__main__":

@@ -65,12 +65,17 @@ def main(task, data, performance_needs, time, budget, eco_friendliness, max_time
         node_key = next(iter(s))
         node_response = s[node_key]
         result_data = node_response['dataframe']
+        architecture_reasoning = node_response['architecture_reasoning']
+        training_strategy= node_response['training_strategy']
+        model_architecture= node_response['model_architecture']
+        weight_reasoning = node_response['weight_reasoning']
+       
     
     # Convert result data into Pandas DataFrame
     df = pd.DataFrame(result_data)
     
     # Return the DataFrame as JSON
-    return df.to_json()
+    return df.to_json(), weight_reasoning,  model_architecture, training_strategy, architecture_reasoning
 
 if __name__ == "__main__":
     # Test invocation of the main function
