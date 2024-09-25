@@ -20,7 +20,7 @@ def home():
     Input:
         - GET: None
         - POST: User input fields including task, data, performance needs, time, budget, eco-friendliness,
-                and optional fields for maximum time, cost, and CO2.
+                and optional fields for maximum time, cost, and CO2. 
     
     Output:
         - Renders 'form.html' with either the input form (GET request) or the results (POST request).
@@ -49,7 +49,7 @@ def home():
         print(f"Task: {task}, Data: {data}, Performance Needs: {performance_needs}, Time: {time}, Budget: {budget}, Eco Friendliness: {eco_friendliness}, Max Time: {max_time}, Max Cost: {max_cost}, Max CO2: {max_co2}")
     
         try:
-            result_json, weight_reasoning, model_architecture, training_strategy, architecture_reasoning = main(
+            result_json, weight_reasoning, model_architecture, training_strategy, architecture_reasoning, cost_weight, time_weight, eco_weight = main(
                 task, data, performance_needs, time, budget, eco_friendliness,
                 max_time=max_time, max_cost=max_cost, max_co2=max_co2
             )
@@ -63,7 +63,12 @@ def home():
             weight_reasoning=weight_reasoning,
             model_architecture=model_architecture,
             training_strategy=training_strategy,
-            architecture_reasoning=architecture_reasoning
+            architecture_reasoning=architecture_reasoning,
+
+            cost_weight = cost_weight,
+            time_weight = time_weight,
+            eco_weight = eco_weight
+
         )
 
     return render_template("form.html")

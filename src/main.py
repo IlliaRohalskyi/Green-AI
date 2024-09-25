@@ -69,12 +69,16 @@ def main(task, data, performance_needs, time, budget, eco_friendliness, max_time
         training_strategy= node_response['training_strategy']
         model_architecture= node_response['model_architecture']
         weight_reasoning = node_response['weight_reasoning']
+
+        cost_weight = node_response['cost_weight']
+        time_weight = node_response['time_weight']
+        eco_weight = node_response['eco_weight']
        
 
     df = pd.DataFrame(result_data)
     
   
-    return df.to_json(), weight_reasoning,  model_architecture, training_strategy, architecture_reasoning
+    return df.to_json(), weight_reasoning,  model_architecture, training_strategy, architecture_reasoning, cost_weight, time_weight, eco_weight
 
 if __name__ == "__main__":
     
