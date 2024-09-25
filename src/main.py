@@ -57,10 +57,10 @@ def main(task, data, performance_needs, time, budget, eco_friendliness, max_time
         ),
         thread,
     ):
-        # Example print for each state (optional)
+   
         print(s)
         
-    # Assuming result_data is collected in the stream loop
+
     if len(s) == 1:
         node_key = next(iter(s))
         node_response = s[node_key]
@@ -70,15 +70,14 @@ def main(task, data, performance_needs, time, budget, eco_friendliness, max_time
         model_architecture= node_response['model_architecture']
         weight_reasoning = node_response['weight_reasoning']
        
-    
-    # Convert result data into Pandas DataFrame
+
     df = pd.DataFrame(result_data)
     
-    # Return the DataFrame as JSON
+  
     return df.to_json(), weight_reasoning,  model_architecture, training_strategy, architecture_reasoning
 
 if __name__ == "__main__":
-    # Test invocation of the main function
+    
     result = main(
         "I want to build a computer vision model that detects cars in images.",
         "I have a dataset of 1 million car images labeled with their bounding boxes.",
