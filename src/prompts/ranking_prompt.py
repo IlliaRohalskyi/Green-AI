@@ -8,5 +8,5 @@ Pay attention to the constraints and requirements of the task provided by the us
 
 Provide the values in the format of 0.0 to 1.0. For example, 0.4, 0.2, 0.
 
-4. Reasoning: Explain why you chose the ranking for each priority without repeating the rankings.
+4. Reasoning: Explain why you chose the ranking for each priority without mentioning the ranking coefficients.
 """
