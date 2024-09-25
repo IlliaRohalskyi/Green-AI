@@ -12,3 +12,5 @@ src/main.py
 src/components/__init__.py
 src/components/document_loader.py
 src/components/vector_store.py
+src/webapp/__init__.py
+src/webapp/app.py
