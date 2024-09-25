@@ -4,10 +4,10 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from config import EMISSIONS_PATH, GPUS_PATH, MODEL_FLOPS_PATH, PRICING_PATH
+from src.config import EMISSIONS_PATH, GPUS_PATH, MODEL_FLOPS_PATH, PRICING_PATH
 from src.utils.get_root import get_root
-from utils.data_processing import normalize_data
-from utils.time_formatting import format_time
+from src.utils.data_processing import normalize_data
+from src.utils.time_formatting import format_time
 from src.logger import logging
 
 

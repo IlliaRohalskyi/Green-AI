@@ -1,9 +1,9 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from models.llm_model import get_llm_model
-from models.state_models import MainState, TimeState
-from prompts.calculator_prompt import CALCULATOR_PROMPT
-from utils.gpu_calculations import recommend_gpu_configuration
+from src.models.llm_model import get_llm_model
+from src.models.state_models import MainState, TimeState
+from src.prompts.calculator_prompt import CALCULATOR_PROMPT
+from src.utils.gpu_calculations import recommend_gpu_configuration
 
 from src.logger import logging
 

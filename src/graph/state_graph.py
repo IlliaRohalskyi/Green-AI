@@ -1,7 +1,7 @@
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, StateGraph
 
-from config import MAX_SIMPLIFICATION_ATTEMPTS
+from src.config import MAX_SIMPLIFICATION_ATTEMPTS
 from src.models.state_models import MainState
 from src.nodes.architecture_node import architecture_node
 from src.nodes.calculator_node import calculator_node
