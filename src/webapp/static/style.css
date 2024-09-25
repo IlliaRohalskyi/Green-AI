@@ -1,0 +1,153 @@
+/* Allgemeine Stile */
+body {
+    font-family: 'Arial', sans-serif;
+    margin: 0;
+    padding: 0;
+    background-color: #1c1c1c;
+    color: #ccc;
+}
+
+header {
+    background-color: #1c1c1c;
+    padding: 20px;
+    text-align: center;
+}
+
+.logo-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.logo-container img {
+    height: 80px;
+    margin-right: 15px;
+}
+
+.greenai-title {
+    color: #4CAF50;
+    font-size: 2.5em;
+}
+
+/* Hauptinhalt */
+main {
+    width: 90%;
+    max-width: 1200px;
+    margin: 20px auto;
+    background-color: #2c2c2c;
+    padding: 20px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* Formular Stile */
+form {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+form label {
+    font-weight: bold;
+    margin-bottom: 5px;
+    color: #fff;
+}
+
+form input[type="text"] {
+    width: 100%;
+    padding: 10px;
+    border-radius: 5px;
+    border: 1px solid #444;
+    background-color: #333;
+    color: #fff;
+}
+
+form input[type="checkbox"] {
+    margin-left: 10px;
+}
+
+form button {
+    grid-column: span 2;
+    padding: 10px 20px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 1.1em;
+    cursor: pointer;
+}
+
+form button:hover {
+    background-color: #45a049;
+}
+
+/* Tabellen Stile */
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+table thead {
+    background-color: #333;
+    color: white;
+}
+
+table th, table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #555;
+}
+
+table tbody tr:hover {
+    background-color: #444;
+}
+
+/* Sterne Bewertung */
+.stars {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 1.5em;
+}
+
+.stars-small {
+    display: flex;
+    justify-content: flex-end;
+    font-size: 1.2em;
+}
+
+/* Sterne Hover Tooltip */
+.stars-small span,
+.stars span {
+    position: relative;
+    cursor: pointer;
+}
+
+.stars-small span::after,
+.stars span::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 150%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 5px;
+    background-color: #444;
+    color: #fff;
+    border-radius: 5px;
+    font-size: 0.8em;
+    opacity: 0;
+    transition: opacity 0.3s;
+    white-space: nowrap;
+}
+
+.stars-small span:hover::after,
+.stars span:hover::after {
+    opacity: 1;
+}
+
+.full-star, .half-star, .empty-star {
+    font-size: inherit;
+    color: #FFD700;
+    margin-left: 5px;
+}
+

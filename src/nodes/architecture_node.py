@@ -1,9 +1,9 @@
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from models.llm_model import get_llm_model
-from models.state_models import ArchitectureState, MainState
-from prompts.architecture_prompt import ARCHITECTURE_PROMPT
-from prompts.simplification_prompt import SIMPLIFICATION_PROMPT
+from src.models.llm_model import get_llm_model
+from src.models.state_models import ArchitectureState, MainState
+from src.prompts.architecture_prompt import ARCHITECTURE_PROMPT
+from src.prompts.simplification_prompt import SIMPLIFICATION_PROMPT
 from src.logger import logging
 
 def architecture_node(state: MainState) -> MainState:

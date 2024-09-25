@@ -1,34 +1,28 @@
-"""
-This module initializes and runs a state graph.
-
-Classes:
-    MainState: Represents the state of the graph with various attributes.
-
-Functions:
-    main(): Initializes the graph and streams states through it, printing each state.
-
-Usage:
-    Run this module as a script to execute the main function.
-"""
-
+import pandas as pd
 from src.graph.state_graph import create_graph
 from src.models.state_models import MainState
 from src.logger import logging
 
-
-def main():
+def main(task, data, performance_needs, time, budget, eco_friendliness, max_time=1e19, max_cost=None, max_co2=None):
     """
     Main function that creates a graph and iterates over the stream of MainState objects.
     Each MainState object represents a task.
-    The function prints each MainState object.
+    The function returns the result as a Pandas DataFrame.
 
     Parameters:
-        None
+        task (str): The task description.
+        data (str): Information about the dataset.
+        performance_needs (str): Performance requirements.
+        time (str): Time constraints.
+        budget (str): Budget constraints.
+        eco_friendliness (str): Eco-friendliness considerations.
+        max_time (float): Maximum allowed time for training.
+        max_cost (float): Maximum allowed cost.
+        max_co2 (float): Maximum allowed CO2 emissions.
     Returns:
-        None
+        str: The resulting dataframe in JSON format.
     """
     logging.info("Starting main function")
-
 
     graph = create_graph()
 
@@ -37,16 +31,15 @@ def main():
     thread = {"configurable": {"thread_id": "1"}}
     logging.info(f"Thread initialized: {thread}")
 
+    result_data = []
     for s in graph.stream(
         MainState(
-            task="I want to build a computer vision model that detects cars in images.",
-            data=(
-                "I have a dataset of 1 million car images labeled with their bounding boxes. "
-            ),
-            performance_needs="The model should achieve best accuracy.",
-            time="I have few days to train the model.",
-            budget="Budget is not a major concern. But I want to minimize the cost.",
-            eco_friendliness="I don't care about eco-friendliness.",
+            task=task,
+            data=data,
+            performance_needs=performance_needs,
+            time=time,
+            budget=budget,
+            eco_friendliness=eco_friendliness,
             weight_reasoning="",
             eco_weight=0.0,
             time_weight=0.0,
@@ -56,21 +49,44 @@ def main():
             tflops_precision="",
             architecture_reasoning="",
             dataframe={},
-            max_time=1e19,
-            max_cost=None,
-            max_co2=None,
+            max_time=max_time,
+            max_cost=max_cost,
+            max_co2=max_co2,
             simplification_attempts=0,
             constraints_met=True,
         ),
         thread,
     ):
-        print(s)        
+   
+        print(s)
+        
+
     if len(s) == 1:
         node_key = next(iter(s))
         node_response = s[node_key]
-        print(node_response['dataframe'])
+        result_data = node_response['dataframe']
+        architecture_reasoning = node_response['architecture_reasoning']
+        training_strategy= node_response['training_strategy']
+        model_architecture= node_response['model_architecture']
+        weight_reasoning = node_response['weight_reasoning']
+       
 
-
+    df = pd.DataFrame(result_data)
+    
+  
+    return df.to_json(), weight_reasoning,  model_architecture, training_strategy, architecture_reasoning
 
 if __name__ == "__main__":
-    main()
+    
+    result = main(
+        "I want to build a computer vision model that detects cars in images.",
+        "I have a dataset of 1 million car images labeled with their bounding boxes.",
+        "The model should achieve best accuracy.",
+        "I have few days to train the model.",
+        "Budget is not a major concern.",
+        "I don't care about eco-friendliness.",
+        max_time=100000,
+        max_cost=5000,
+        max_co2=50
+    )
+    print(result)

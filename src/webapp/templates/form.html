@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GreenAI - Results</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="logo-container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="GreenAI Logo">
+            <h1 class="greenai-title">GreenAI</h1>
+        </div>
+    </header>
+
+    <main>
+        <form method="POST">
+            <label for="input1">Task:</label>
+            <input type="text" id="input1" name="input1" placeholder="E.g., Build a model to detect cars in images" required>
+
+            <label for="input2">Data:</label>
+            <input type="text" id="input2" name="input2" placeholder="E.g., 1 million images of cars with bounding boxes" required>
+
+            <label for="input3">Performance Needs:</label>
+            <div>
+                <input type="text" id="input3" name="input3" placeholder="High accuracy required">
+                <input type="checkbox" id="performance_important" name="performance_important" value="this is not important for me">
+                <label for="performance_important">Not important</label>
+            </div>
+
+            <label for="input4">Time:</label>
+            <div>
+                <input type="text" id="input4" name="input4" placeholder="Few days to train the model">
+                <input type="checkbox" id="time_important" name="time_important" value="this is not important for me">
+                <label for="time_important">Not important</label>
+            </div>
+
+            <label for="input5">Budget:</label>
+            <div>
+                <input type="text" id="input5" name="input5" placeholder="Minimize costs, but not critical">
+                <input type="checkbox" id="budget_important" name="budget_important" value="this is not important for me">
+                <label for="budget_important">Not important</label>
+            </div>
+
+            <label for="input6">Eco Friendliness:</label>
+            <div>
+                <input type="text" id="input6" name="input6" placeholder="No eco-friendliness concerns">
+                <input type="checkbox" id="eco_important" name="eco_important" value="this is not important for me">
+                <label for="eco_important">Not important</label>
+            </div>
+
+            <label for="input_max_time">Maximum Time:</label>
+            <input type="text" id="input_max_time" name="input_max_time" placeholder="Maximum training time (e.g., 10 days)">
+
+            <label for="input_max_cost">Maximum Cost:</label>
+            <input type="text" id="input_max_cost" name="input_max_cost" placeholder="Maximum budget (e.g., 5000 USD)">
+
+            <label for="input_max_co2">Maximum CO2:</label>
+            <input type="text" id="input_max_co2" name="input_max_co2" placeholder="Maximum CO2 emissions (e.g., 50 kg)">
+
+            <button type="submit">Submit</button>
+        </form>
+
+        {% if result_data %}
+        <h2>Project Overview</h2>
+        <p><strong>Weight Reasoning:</strong> {{ weight_reasoning }}</p>
+        <p><strong>Model Architecture:</strong> {{ model_architecture }}</p>
+        <p><strong>Training Strategy:</strong> {{ training_strategy }}</p>
+        <p><strong>Architecture Reasoning:</strong> {{ architecture_reasoning }}</p>
+
+        <h2>Results</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>GPU</th>
+                    <th>CO2 (kg)</th>
+                    <th>Cost ($)</th>
+                    <th>Region</th>
+                    <th>Time</th>
+                    <th>CO2 Score</th>
+                    <th>Time Score</th>
+                    <th>Cost Score</th>
+                    <th>Overall Score</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for idx in result_data['GPU'].keys() %}
+                <tr>
+                    <td>{{ result_data['GPU'][idx] }}</td>
+                    <td>{{ result_data['CO2 (kg)'][idx] | round(2) }}</td>
+                    <td>{{ result_data['Cost ($)'][idx] | round(2) }}</td>
+                    <td>{{ result_data['Region'][idx] }}</td>
+                    <td>{{ result_data['Time (formatted)'][idx] }}</td>
+                    <td>
+                        <div class="stars-small" title="{{ result_data['CO2 (kg)_Score'][idx] | round(2) }}">
+                            {% set score = result_data['CO2 (kg)_Score'][idx] %}
+                            {% set rounded_score = (score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars-small" title="{{ result_data['Time_Score'][idx] | round(2) }}">
+                            {% set time_score = result_data['Time_Score'][idx] %}
+                            {% set rounded_time_score = (time_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_time_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_time_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars-small" title="{{ result_data['Cost ($)_Score'][idx] | round(2) }}">
+                            {% set cost_score = result_data['Cost ($)_Score'][idx] %}
+                            {% set rounded_cost_score = (cost_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_cost_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_cost_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                    <td>
+                        <div class="stars" title="{{ result_data['Ranking'][idx] | round(2) }}">
+                            {% set overall_score = result_data['Ranking'][idx] %}
+                            {% set rounded_overall_score = (overall_score * 2) | round / 2 %}
+                            {% for i in range(5) %}
+                                {% if rounded_overall_score >= i + 1 %}
+                                    <span class="full-star">&#9733;</span>
+                                {% elif rounded_overall_score >= i + 0.5 %}
+                                    <span class="half-star">&#9733;</span>
+                                {% else %}
+                                    <span class="empty-star">&#9734;</span>
+                                {% endif %}
+                            {% endfor %}
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </main>
+
+</body>
+</html>
