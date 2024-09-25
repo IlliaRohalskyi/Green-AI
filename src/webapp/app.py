@@ -33,7 +33,7 @@ def home():
         budget = request.form.get("input5")
         eco_friendliness = request.form.get("input6")
         
-        max_time = float(request.form.get("input_max_time", 1e19)) if request.form.get("input_max_time") else 1e19
+        max_time = (float(request.form.get("input_max_time", 1e19))*24*60*60) if request.form.get("input_max_time") else None
         max_cost = float(request.form.get("input_max_cost", None)) if request.form.get("input_max_cost") else None
         max_co2 = float(request.form.get("input_max_co2", None)) if request.form.get("input_max_co2") else None
 
