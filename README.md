@@ -10,6 +10,33 @@ GreenAI is an intelligent system that optimizes AI model training by recommendin
 - **Intuitive User Interface**: Easy-to-use input form and results display with star ratings and tooltips for detailed insights.
 - **Intelligent Decision Making**: Utilizes a language model to analyze inputs and provide reasoned architecture and training strategy recommendations.
 
+## Installation and Setup
+
+Follow these steps to set up GreenAI on your local machine:
+
+1. Ensure you have **Python 3.11.9** installed. You can download it from [python.org](https://www.python.org/downloads/).
+
+2. Clone the repository:
+    ```bash
+    git clone https://github.com/IlliaRohalskyi/Green-AI.git
+    cd Green-AI
+    ```
+
+3. Install the required Python packages:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+4. Download and install Ollama:
+    Visit the [Ollama website](https://ollama.com/) and follow the installation instructions for your operating system.
+
+5. Run the application:
+    ```bash
+    python /src/webapp/app.py
+    ```
+
+This will start the GreenAI web application. You can access it by opening a web browser and navigating to the address (typically `http://localhost:5000`).
+
 ## How It Works
 
 1. **Input**: Users provide task description, dataset information, performance needs, and constraints.
@@ -39,14 +66,33 @@ GreenAI is an intelligent system that optimizes AI model training by recommendin
 ## Use Cases
 
 GreenAI is suitable for various AI projects, including:
-- Natural language processing tasks (e.g., sentiment analysis classification)
+- Text classification (e.g., sentiment analysis)
 - Computer vision tasks (e.g., object detection for autonomous vehicles)
+- Image processing (e.g., stock photo categorization)
 
+## Future Improvements
+
+- Multi-GPU support for parallel processing recommendations
+- Expanded GPU database for more hardware options
+- Chatbot integration for guided user input
 
 ## Contributing
 
-We welcome contributions to improve GreenAI.
+We welcome contributions to improve GreenAI. To contribute:
+
+1. Fork the repository
+2. Create a new branch (`git checkout -b feature/AmazingFeature`)
+3. Make your changes
+4. Commit your changes (`git commit -m 'Add some AmazingFeature'`)
+5. Push to the branch (`git push origin feature/AmazingFeature`)
+6. Open a Pull Request
+
+Please ensure your code adheres to the project's coding standards and include tests for new features.
 
 ## License
 
-Apache License 2.0
+This project is licensed under the Apache License 2.0. See the [LICENSE](LICENSE) file for details.
+
+## Contact
+
+For questions or support, please open an issue on this GitHub repository.
