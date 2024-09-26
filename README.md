@@ -30,7 +30,12 @@ Follow these steps to set up GreenAI on your local machine:
 4. Download and install Ollama:
     Visit the [Ollama website](https://ollama.com/) and follow the installation instructions for your operating system.
 
-5. Run the application:
+5. Install Phi3 Mini
+   ```bash
+   ollama pull phi3:mini
+   ```
+
+6. Run the application:
     ```bash
     python /src/webapp/app.py
     ```
