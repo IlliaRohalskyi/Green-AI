@@ -1,0 +1,1014 @@
+Abstract:
+
+Abstract.
+With the ever-growing adoption of AI-based systems, the carbon footprint of AI is no longer negligible. AI researchers and practitioners are therefore urged to hold themselves accountable for the carbon emissions of the AI models they design and use. This led in recent years to the appearance of researches tackling AI environmental sustainability, a field referred to as Green AI. Despite the rapid growth of interest in the topic, a comprehensive overview of Green AI research is to date still missing. To address this gap, in this paper, we present a systematic review of the Green AI literature. From the analysis of 98 primary studies, different patterns emerge. The topic experienced a considerable growth from 2020 onward. Most studies consider monitoring AI model footprint, tuning hyperparameters to improve model sustainability, or benchmarking models. A mix of position papers, observational studies, and solution papers are present. Most papers focus on the training phase, are algorithm-agnostic or study neural networks, and use image data. Laboratory experiments are the most common research strategy. Reported Green AI energy savings go up to 115%, with savings over 50% being rather common. Industrial parties are involved in Green AI studies, albeit most target academic readers. Green AI tool provisioning is scarce. As a conclusion, the Green AI research field results to have reached a considerable level of maturity. Therefore, from this review emerges that the time is suitable to adopt other Green AI research strategies, and port the numerous promising academic results to industrial practice.
+
+
+
+
+1. Introduction
+
+In recent years, the Artificial Intelligence (AI) community has been challenged to bring the carbon footprint of AI models to the top of their research agenda.
+The iconic paper by Strubell2019Monitoring  \citePStrubell2019Monitoring analyzes the carbon impact of training their own state-of-the-art models. Results lead to the conclusion that we need to reduce the carbon footprint of developing and running AI models.
+
+
+This self-reflection was an eye-opener to the AI research community.
+Many papers followed, calling for a new research direction that would consider this problem. Schwartz2020GreenAI coined the term Green AI as “AI research that yields novel results while taking into account the computational cost” \citePSchwartz2020GreenAI. Bender2021Parrots published a position paper highlighting the consequences of continuously increasing the size of AI models \citePBender2021Parrots. A natural question that is posed is whether we are doing enough as a research community to mitigate the carbon impact of developing and running AI-based software.
+
+
+AI systems are significantly complex and, to achieve Green AI, we need a joint effort that targets all the different stages of an AI system’s lifecycle (e.g, data collection, training, monitoring), different artifacts (e.g., data, model, pipeline, architecture, hardware), etc (Haakman et al., 2021).
+
+
+Given the heterogeneity of the field, it is also difficult to have a broad view of all the Green AI literature that has been published in the past years.
+To understand the existing research, we conduct a systematic literature review on Green AI. We provide an overview and characterization of the existing research in this field. Moreover, we study how the field has been evolving over the years, pinpoint the main topics, approaches, artifacts, and so on.
+
+
+This literature review shows that there has been a significant growth in Green AI publications – 76% of the papers have been published since 2020.
+The most popular topics revolve around monitoring, hyperparameter tuning, deployment, and model benchmarking. We also highlight other emerging topics that might lead to interesting solutions – namely, Data Centric Green AI, Precision/Energy Trade-off analysis.
+The current body of research has already showcased promising results with energy savings from 13% up to 115%. Still, most of the existing work focuses on the training stage of the AI model.
+Moreover, we observe that there is little involvement of the industry (23%) and that most studies revolve around laboratory experiments. We argue that the field is growing to a level of maturity in which involvement of the industry is quintessential to enable the overarching goal of Green AI: harness the full potential of AI without a negative impact in our planet.
+
+
+To encourage open science and the reproducibility of this study, we provide all data and scripts in a replication package available online with an open-source license111Replication package: https://github.com/luiscruz/slr-green-ai.
+
+
+The remainder of this paper is structured as follows. In Section 2, we describe the methodology used to collect and analyze Green AI literature. In Section 3, we present all the results yielded by our methodology. Section 4 discusses findings and reflects on the impact of our results in the research community. In Section 5, we reflect on the potential threats to the validity of this study. Following, Section 6 describes related work and pinpoints the differences with our study. The main conclusions and future work are presented in Section 7.
+
+
+Figure 1. Systematic literature review process overview.
+
+
+
+
+
+2. Methodology
+
+In this section, we document the research design, which was rigorously adhered to during the planning and execution of the study.
+We primarily followed the guidelines for conducting SLRs in software engineering research presented by Kitchenham (Kitchenham, 2004).
+
+
+
+2.1. Research Objective and Question
+
+The goal of this review is to understand the characteristics of existing Green AI research.
+By utilizing the Goal-Question-Metric method (Basili et al., 1994), this objective can be described more formally as follows:
+
+
+Analyze Green AI literature
+For the purpose of knowledge collection and categorization
+With respect to AI 
+From the viewpoint of researchers and practitioners
+In the context of environmental sustainability.
+
+
+
+The goal of this research can be directly translated into a research question (RQ), which states as follows:
+
+
+
+
+RQ:
+
+What are the characteristics of Green AI state-of-the-art research?
+
+
+
+By answering our research question, we aim at gaining a systematic overview of the Green AI body of knowledge, starting from an outline of the general publication trends, to a detailed analysis of the past and current Green AI research activities and their characteristics.
+
+
+
+
+
+2.2. Research Process
+
+An overview of the research process followed is depicted in Figure 1.
+The process starts with the execution of a conservative automated search query via the digital libraries and indexing platforms Google Scholar, Scopus, and Web of Science,
+complemented by a subsequent iterative bidirectional snowballing process, which is conducted until the achievement of theoretical saturation.
+Including multiple literature indexing platforms to execute the automated search allows us to conduct an encompassing search of the literature based on multiple sources, hence allowing us to mitigate potential threats to external validity, as further documented in Section 5. Following, the details of each step of our research process are documented in detail.
+
+
+
+2.2.1. Automated Initial Search.
+
+To identify a preliminary set of potentially relevant research works, we design an encompassing automated query to be executed on three different literature indexers, namely Google Scholar, Scopus, and Web of Science. The automated query targeting publication titles states as follows:
+
+
+Listing 1: Automated search query
+
+⬇
+
+1INTITLE("green" OR "sustainab*") AND
+
+
+2INTITLE("AI" OR "ML" OR "artificial␣intelligence"
+
+
+3OR "machine␣learning" OR "deep␣learning")
+
+
+
+
+The query is designed to retrieve literature with titles containing keywords related to sustainability, identified by the keywords green or sustainability and its variations, e.g., “sustainable” (Listing 1, Lines 1). The second part of the query instead is used to retrieve literature concerning AI, or related synonyms and acronyms (Listing 1, Lines 2-3).
+The query is executed on the three aforementioned literature libraries and indexes on the 18th of July 2022, and led to the identification of 190 potentially relevant studies. In order to be as comprehensive as possible, and avoid potential threats to external validity, the year of publication is left unbounded in the automated search.
+
+
+
+
+2.2.2. Application of Selection Criteria.
+
+Subsequent to the identification of the initial potentially relevant studies, we execute the manual selection of the studies via a set of selection criteria defined a priori. A paper is confirmed as primary study if it adheres to all inclusion criteria, and none of the exclusion ones.
+The following inclusion (I) and exclusion (E) criteria are used:
+
+
+
+
+I1-
+
+The study regards AI
+
+
+
+I2-
+
+The study regards environmental sustainability
+
+
+
+I3-
+
+The study regards the environmental sustainability of AI
+
+
+
+I4-
+
+The study regards the software level
+
+
+
+E1-
+
+The study is not written in English
+
+
+
+E2-
+
+The study is not available
+
+
+
+E3-
+
+The study is a duplicate or extensions of an already included study
+
+
+
+E4-
+
+The study is a secondary or tertiary study
+
+
+
+E5-
+
+The study is in the form of editorials, tutorials, books, extended abstracts, etc.
+
+
+
+E6-
+
+The study is a non-scientific publication or grey literature
+
+
+
+
+
+With the first three inclusion criteria (I1-I3), we ensure that the primary studies focus on Green AI (I1, I2), and that the studies regard the environmental sustainability of AI, rather than the improvement of environmental sustainability through AI. With the fourth inclusion criterion instead (I4), we ensure that the primary studies focus on software-centric Green AI. This latter criterion is used to exclude studies focusing on hardware-specific Green AI techniques, e.g., the use of ad hoc implemented hardware components, which we consider out of reach for most researchers/practitioners interested in Green AI, and is only marginal to the definition of Green AI itself (Schwartz2020GreenAI).
+
+
+The exclusion criteria are designed to ensure that data can be extracted from the papers (E1, E2), do not represent duplication or redundancy with respect to other primary studies (E3, E4), and are provided in the form of scientific studies (E5, E6).
+
+
+To ease the primary study selection process, adaptive reading depth (Petersen et al., 2008) is used to efficiently assess potentially relevant studies.
+In order to mitigate subjective biases and interpretations, the three authors independently utilized the selection criteria to scrutinize 63-64 candidate studies. Weekly meeting are held during the selection process to jointly discuss examples, doubts, and align the selection process between the three researchers.
+
+
+The application of the selection criteria concludes with the identification of 16 primary studies, which constitute the starting set for the subsequent snowballing process.
+
+
+
+
+2.2.3. Snowballing.
+
+In order to enrich the set of selected primary studies, and ensure that the primary study comprehensively represents the Green AI body of literature, the automated search results are complemented with a recursive bidirectional snowballing process (Wohlin, 2014).
+This step entails the scrutiny of all studies either citing or cited by the already included primary studies.
+As for the application of selection criteria, three researchers are involved in the snowballing. During each snowballing round, the researchers independently snowball different primary studies, and propose new primary studies to be included, i.e., the new identified studies which adhere to the selection criteria. During each snowballing round, examples, doubts, and divergences are jointly revisited and resolved, and the next snowballing iteration is started.
+A total of two rounds of backward and forward snowballing are executed before no new studies are identified, i.e., when theoretical saturation is reached.
+The snowballing process terminates with the inclusion of 82 new primaries studies, leading to a total of 98 primary studies which are considered in the literature review reported in this research.
+
+
+
+
+2.2.4. Data Extraction.
+
+In order to achieve the intended goal of this study and answer our RQ (see Section 2.1), we proceed to systematically extract data from the primary studies. The data extraction process consisted of two subsequent phases.
+
+
+The first phase consists of a data exploration process, which terminates with the establishment of the data extraction framework of this study. Specifically, during this first phase, the three authors of this review independently scan the identified primary studies, and annotate the characteristics of the studies which are relevant to answer our RQ. The identified characteristics are then jointly discussed and refined, leading to the consolidation of the fields constituting the data extraction framework of this review.
+
+
+In the second data extraction phase, the primary studies are thoroughly analyzed, and the data is extracted from the studies according to the data extraction framework.
+
+
+The fields of the data extraction framework utilized for this literature review on Green AI are the following.
+
+
+
+
+•
+
+Green AI Definition: the level of abstraction used in the paper to quantify the impact of AI in the surrounding environment: energy efficiency (Verdecchia et al., 2021), carbon footprint (Wiedmann and Minx, 2008), or ecological footprint (Matuštík and Kočí, 2021).
+
+
+
+•
+
+Study type: The overarching type of study, which could be either presenting a position on Green AI, a Green AI solution, or an observational study on Green AI;
+
+
+
+•
+
+Topic: The Green AI topic considered in the study, e.g., hyperparameter-tuning to achieve energy efficiency of an AI algorithm;
+
+
+
+•
+
+Domain: The domain considered in the study, e.g., edge or mobile computing;
+
+
+
+•
+
+Type of data: The type of data utilized by AI in the study, e.g., text or images;
+
+
+
+•
+
+Artifact considered: The AI artifact considered in the study, e.g., the data used by AI models, the AI models themselves, or the AI deployment pipeline.
+
+
+
+•
+
+Considered phase: If the study focused on the AI training phase, the AI inference phase, or both.
+
+
+
+•
+
+Research strategy: The research strategy, as defined in  (Stol and Fitzgerald, 2018), used to support the claims reported in the study;
+
+
+
+•
+
+Dataset size: The size of the dataset, in number of data points, considered in the study (if any);
+
+
+
+•
+
+Energy Savings: The reported percentage energy savings achieved by solutions reported in the study (if any is documented);
+
+
+
+•
+
+Industry involvement: Industry involvement in the authorship of the study, which could be either academic-only authorship, industrial-only authorship, or mixed authorship;
+
+
+
+•
+
+Intended reader: If the study is primarily intended for academic readers, industrial readers, or the general public.
+
+
+
+•
+
+Tool availability: The availability of the tool(s) to address Green AI presented in the study (if any).
+
+
+
+
+
+
+
+2.2.5. Data Synthesis.
+
+During the data extraction process, the data was harmonized by relying on the constant comparison (Glaser, 1965) of extracted keywords, breaking up keywords into more specific ones when their semantic depth required it, or merging very similar keywords to avoid redundancy. This analysis process relied on open coding (Jenner et al., 2004) to systematically identify recurrent concepts, followed by axial coding (Jenner et al., 2004) to manage the increasing complexity of some emerging concepts.
+
+
+The only exceptions were made for the research strategy, industry involvement, and tool availability fields of the extraction framework (see Section 2.2.4), for which provisional coding was used (Jenner et al., 2004). Specifically, coding of the research strategy relied on the research strategy categories reported by Stol et al. (Stol and Fitzgerald, 2018) was used. The industry involvement instead relied on three pre-defined fields, namely “academic-only authorship”, “industrial-only authorship”, or “mixed authorship”. Finally, tool availability could only assume one of two pre-defined values, namely “Yes” (if the tool is available) or “No” (if the tool is not available, or none is presented in the primary study).
+
+
+During the data extraction and synthesis phase, emerging codes are continuously discussed among the three authors of the review. This process ensures that the emerging codes and their abstraction level are kept consistent among researchers, and are aligned with the research goal and question of the study.
+
+
+
+
+
+
+
+3. Results
+
+In this section, we present the results collected with our SLR on Green AI.
+
+
+
+3.1. Publication Years
+
+The literature spans from 2015 with the first publication on the topic to this present year (i.e., 2022). Figure 2 presents the distribution of the literature papers regarding the publication year. We observe a global increase following the years. Furthermore, a spike in the number of publications is seen in 2020, going from 7 publications in 2019 to 20 in 2020.
+As the automated initial search was launched in 2022, the publication trends reported in this review might not be representative of the actual research output of 2022 (see also Section 2.2.1).
+
+
+Figure 2. Number of publications per year.
+
+
+
+
+3.2. Venue Types
+
+Publications are particularly concentrated on conferences (▷▷\triangleright 47 out of 98 papers.) and journals (▷▷\triangleright 39 out of 98 papers.). Only 12 out of the 98 publications are associated with a workshop. Conferences being treated as an equal publishing venue as journals follows the trends observed in the computer science research field (Vrettas and Sanderson, 2015; Kim, 2019).
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI publication trends
+\faLeaf The topic of Green AI is experiencing an increasing trend of popularity, with a considerable growth in publications from 2020 onward. Most studies are published in conferences and journals, while only a minor portion in workshops.
+
+
+\endMakeFramed
+
+
+
+
+3.3. Green AI Definition
+
+The distribution of publications across different Green AI definitions is presented in Figure 3. Most literature addresses Green AI at the level of energy efficiency (81 papers). Higher-level definitions, namely carbon and ecological footprint, are only addressed in 20 and 9 publications respectively. Note that a primary study might be mapped to more than one definition, if more than one is used in the paper at hand.
+
+
+Figure 3. Number of publications per type of Green AI definition.
+
+
+
+
+3.4. Study Types
+
+Existing literature on Green AI spans across three types of studies, namely observational, solution, and position papers (see also Section 2.2.4). As shown in Figure 4, from the 98 papers covered in this review, the most common are solution papers, with 51 entries, followed by observational with 35, and position papers with 12. Note that study types are mutually exclusive, i.e., a single paper has only one study type.
+
+
+Figure 4. Number of publications per study type.
+
+
+
+
+3.5. Green AI Topics
+
+From our analysis we identify 13 main topics being addressed by the Green AI literature. Figure 5 depicts the distribution of publications across the different topics.
+The most popular topic is Monitoring, addressed by 28 papers, followed by Hyperparameter Tuning (18), Model Benchmarking (17), Deployment (17), and Model Comparison (17).
+Since papers are not exclusive to a single topic, these top-4 topics alone cover 61% of the papers in this review.
+Below, we pinpoint each topic with a short summary and the respective number of publications.
+
+
+Monitoring
+
+▷▷\triangleright 28 out of 98 papers.
+Covering monitoring approaches to study the energy and/or carbon footprint of AI models.
+
+
+In this topic, papers report and reflect on the energy footprint of state-of-the-art models throughout their lifecycle. For example, Wu et al. \citePwu2022sustainable provide a landscape of the carbon footprint of AI models across Facebook. Findings showcase that, typically, throughout the lifetime of AI models, 50% of their carbon cost lies in the embodied carbon footprint of the hardware used to develop these models. However, the paper shows that the vast majority of training workflows under-utilizes GPUs at 30–50% of their full capacity.
+
+
+Other papers within this topic focus on solutions to make carbon monitoring feasible in any AI project \citePgarcia2019estimation. As an example, the Carbontracker offers a toolset to track and predict the energy and carbon footprint of training DL models \citePanthony2020carbontracker. These studies argue that it is quintessential to report the energy and carbon footprint of model development and training alongside performance metrics.
+
+
+
+Hyperparameter Tuning
+
+▷▷\triangleright 18 out of 98 papers.
+Improving or assessing the impact on the energy consumption of optimizing hyperparameters when training an AI model.
+
+
+Many publications are motivated by the fact that tuning parameters leads to significant energy costs – it requires retraining a model multiple times in order to find the optimal set of hyperparameter values. Hence, most publications within this topic focus on identifying alternative strategies that reduce the number of iterations required to tune hyperparameters \citePStamoulis2018.
+
+
+On a different perspective, Chavannes et al. \citePPuvis2021Hyperparameter explore how hyperparameter tuning can help deliver more energy-efficient models by adding power consumption to the set of parameters being optimized.
+
+
+
+Model Benchmarking.
+
+▷▷\triangleright 17 out of 98 papers.
+Studies that contribute with benchmarks to compare the energy footprint of different models or training techniques.
+
+
+Benchmarks help the community understand how the state of the art behaves w.r.t. given performance indicators. Ultimately, they help create baselines so that new approaches can be properly validated and compared to the state of the art. As example of publications within this category, Asperti2021  \citePAsperti2021 evaluate the energy cost of different variational autoencoders. Another study, by Yu et al. \citePYu2022Jan, compares the energy efficiency of common machine learning algorithms when applied to clinical laboratorial datasets.
+
+
+
+Deployment
+
+▷▷\triangleright 17 out of 98 papers.
+Addressing the deployment stage of the lifecycle of an AI model.
+
+
+Typically, publications in this topic discuss the problem of deploying AI models in a real scenario or in a scenario with peculiar constraints that challenge a standard approach. For example, deployment publications showcase the challenges of deploying energy-efficient AI in FPGA \citePTao2020, in Edge devices \citePGondi2021Nov,kim2020, in mobile devices \citePWang2022Federated,manasi2020,jayakodi2020, and so on.
+
+
+
+Precision/Energy Trade Off
+
+▷▷\triangleright 11 out of 98 papers.
+There is a turning point where to increase a very small fraction of the model performance, it is required to endure an energy-intensive training loop. Within this topic, papers address the Pareto trade-off between having optimal accuracy and/or optimal energy efficiency.
+
+
+Zhang et al. \citePZhang2018 study how removing neurons from neural networks affects both accuracy and energy consumption. Results indicate that a good portion of neurons are redundant and can be removed to reduce energy consumption without a significant impact on accuracy. At the same time, it shows that there is a turning point where removing neurons improves energy efficiency but significantly reduces accuracy. Hence, the two parameters always need to be analyzed together. Other works opt for optimizing energy while keeping accuracy loss within a negligible margin \citePWang2020May.
+
+
+
+Algorithm Design
+
+▷▷\triangleright 10 out of 98 papers.
+Design of new training algorithms that produce models that are significantly more energy-efficient than the state of the art.
+
+
+Some works propose small changes to the algorithms that make a big difference in the final energy consumption. For example, Garcia-Martin et al. \citePGarcia-Martin2021 approximate the splitting criteria by selecting branches that require less computational effort. Results showcase decision trees that are up to 31% more energy efficient and with minimal impact on accuracy.
+Other examples include Espnetv2 \citePmehta2019, a lightweight convolutional neural network designed with power-efficiency in mind.
+
+
+
+Libraries
+
+▷▷\triangleright 8 out of 98 papers.
+Our choice of libraries have an impact on the final carbon footprint of AI systems. Studies within this topic provide some sort of evaluation of different AI libraries and how they contribute to energy efficiency.
+
+
+This category shows that software engineering studies play an important role in enabling Green AI. Georgiou et al. \citePGeorgiou2022May compare the energy footprint of deep learning frameworks. Results showcase that PyTorch is more energy-efficient than Tensorflow at the training stage. However, Tensorflow tends to be more energy-efficient at the inference stage. The study delves into the framework’s different API methods and highlights code in the frameworks that should be optimized to reduce energy consumption. Finally, the authors motivate the importance of reporting and discussing energy efficiency in the documentation of deep learning frameworks.
+
+
+
+Data Centric
+
+▷▷\triangleright 6 out of 98 papers.
+Typically, the AI community has looked into coming up with better model training strategies. However, there is a new trend in AI that is raising the importance of developing better data collection and processing techniques as a more effective way to deliver better AI models. This line of thought within Green AI aims at reducing the carbon footprint of AI by tackling the problem at the data level.
+
+
+Data-centric approaches for Green AI show that feature selection and subsampling techniques can significantly reduce the energy consumption of training machine learning models \citePVerdecchia2022DataCentricGreenAI. Subsampling strategies can be more sophisticated by removing data points that are expected to be redundant in terms of knowledge acquisition \citePDhabe2021.
+
+
+
+Network Architecture
+
+▷▷\triangleright 6 out of 98 papers.
+The impact of a distributed network on the energy efficiency of AI. AI models are often deployed in a distributed context – e.g., IoT, edge computing, etc. Hence the design and architecture of the network plays an important role in leveraging sustainable models.
+
+
+For example, Kim and Wu \citePkim2020 propose an adaptive execution engine that selects the inference strategy according to the signal strength of the network in different devices, as it is known to affect the energy efficiency of the edge mobile system.
+
+
+
+Estimation
+
+▷▷\triangleright 5 out of 98 papers.
+Collecting and making sense of energy or climate data is far from trivial – many different factors contribute to the final estimation \citePgarcia2019estimation. This topic revolves around understanding ways of estimating the energy consumption or carbon footprint of models.
+
+
+Existing solutions to estimate energy consumption for software fail to provide meaningful insight about energy consumption that can be mapped to a machine learning model’s structure. IrEne creates a graph that breaks down NLP models into low-level machine learning primitives and provides energy estimations at the primitive level \citePCao.
+
+
+
+Emissions
+
+▷▷\triangleright 4 out of 98 papers.
+Papers that focus on understanding the carbon impact of creating and/or consuming AI systems.
+Dhar \citePdhar2020 flags the importance of being able to quantify carbon impact and the lack of tools and data available. Fraga-Lamas et al. \citePFraga-Lamas2021Aug go beyond reporting the energy consumption of an AI-enabled IoT scenario and present how much carbon would be emitted in different countries and different energy sources.
+
+
+
+Policy
+
+▷▷\triangleright 3 out of 98 papers. Studies within this topic address and discuss strategies on how we should handle the carbon footprint of AI as a society.
+
+
+Perucica and Andjelkovic \citePPerucica2022Policy reflect on the environmental policies implemented by the European Union, discussing whether they fit the AI era or new regulations are needed. Rhode et al. \citeProhde2021 call out for the unclear dilemma between the impact of existing/upcoming AI technologies and the commitment to achieve the 1.5℃ climate change goal as expressed in the UNFCCC Paris Declaration.
+
+
+
+Ethics
+
+▷▷\triangleright 3 out of 98 papers.
+Papers that focus on the ethical implications of the growing carbon footprint of AI. Tamburrini \citePTamburrini2022Jan discusses the responsibilities of AI scientists, AI infrastructure providers, and other stakeholders in enabling Green AI. The paper questions whether it is ethically justified to create massive AI pipelines to improve accuracy.
+
+
+
+Other
+
+▷▷\triangleright 5 out of 98 papers.
+Studies addressing a relevant topic with only a single publication in total: User values \citePKonig2022, Scheduling \citePZhu2021Aug, Rebound Effects \citePWillenbacher2021Rebound, Security \citePshumailov2021, Energy Capping \citePkrzywaniak2022gpu.
+
+
+Figure 5. Number of papers per Green AI topic.
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI topics by study type
+\faLeaf There are 13 main topics on Green AI. The majority (61%) of the publications focuses on Monitoring, Hyperparameter-tuning, Model Benchmarking, and Deployment. Despite being important, topics such as Data-Centric, Estimation, and Emissions are underrepresented in the scientific literature.
+
+
+\endMakeFramed
+
+
+
+
+
+3.6. Green AI Topics by Study Type
+
+We further investigate the distribution of papers across different topics per category. Figure 6 presents a bubble plot that draws a bubble for each pair topic (x-axis) and study type (y-axis). The size of the bubble is proportional to the number of papers published in each pair. The plot enables a few observations.
+
+
+Most topics adhere to the general pattern observed earlier in Section 3.4: the majority of papers consist of solution studies, followed by observational and then position.
+However, the topics of Model Benchmarking and Libraries do not follow this pattern, being mostly covered by observational papers. This is expected as these topics revolve around comparing different libraries and models to provide insight on the energy efficiency of different design decisions.
+
+
+Moreover, papers from the least represented topics Ethics, Policy, and Emissions tend to be position papers. From the ten studies in these three topics, only one is observational and none is solution.
+
+
+Also worth noticing is the fact that the majority of the position studies in Green AI only cover the smallest topics. Considering the top-10 topics – from Monitoring to Estimation – only 6 are position papers. In contrast, the bottom-4 topics (including Other) are covered by 10 position papers.
+
+
+Figure 6. Number of publications by topic and study type.
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI topics by study type
+\faLeaf Most publications on Ethics, Policy, and Emissions are position studies calling for more research in these topics.
+
+
+\endMakeFramed
+
+
+
+
+3.7. Domains
+
+Figure 7 presents the distribution of the publications according to the domain they cover.
+The majority of the publications (i.e., ▷▷\triangleright 58 out of 98 papers.) do not devote their studies to a specific domain, but tackle the energy efficiency of AI in a general context.
+Regarding the most specific studies, the most covered domains are:
+
+
+
+Edge: 
+
+
+Regarding Internet of Things and Edge Computing, which are usually associated with distributed systems and networks. ▷▷\triangleright 24 out of 98 papers.
+
+
+Computer Vision: 
+
+
+Regarding image recognition.▷▷\triangleright 6 out of 98 papers.
+
+
+Cloud: 
+
+
+▷▷\triangleright 5 out of 98 papers.
+
+
+Mobile: 
+
+
+▷▷\triangleright 4 out of 98 papers.
+
+
+
+
+
+The Other category gathers publications about a specific domain, being covered only once, among Health, Autonomous Driving, Smart cities, Human Activity, Wearables, and Embedded Systems.
+
+
+Figure 7. Number of publications per study domain.
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI domains
+\faLeaf  The majority of Green AI studies does not focus a specific domain. Among specific domains, edge computing results to be the most recurrent one.
+
+
+\endMakeFramed
+
+
+
+
+3.8. AI Pipeline Phases
+
+The AI pipeline is divided into two major phases: the training, when the AI model is built, and the inference, when the model is used to make predictions from new data. Thus, we classify the papers according to 3 categories: training, inference, and all. The all category translates the fact that the paper does not consider a particular phase, but the whole pipeline.
+
+
+As depicted in Figure 8, we find that most of the publications on the topics of Green AI focus on the training phase (▷▷\triangleright 49 out of 98 papers.). In comparison, fewer papers direct their studies at the inference phase (▷▷\triangleright 17 out of 98 papers.) or on the overall process (▷▷\triangleright 32 out of 98 papers.).
+
+
+Figure 8. Number of publications per studied phase of AI.
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI Pipeline Phase
+\faLeaf Approximately half of Green AI studies focus on the training phase, while a minor portion considers the entire AI pipeline. Only a minor portion of the Green AI literature focuses on the inference phase.
+
+
+\endMakeFramed
+
+
+
+
+3.9. Considered Artifacts
+
+AI systems are based on several artifacts, and tackling the energy efficiency of such systems can thus involve multiple of those artifacts (e.g., data, model, pipeline) or different related artifacts (e.g., architecture, framework, CPU). A distribution of the artifacts considered in the primary studies is documented in Figure 9. The categories of artifacts are:
+
+
+
+Model: 
+
+
+The publications within this category focus on the model and/or associated algorithm to tackle the energy efficiency of AI. ▷▷\triangleright 63 out of 98 papers.
+
+
+Data: 
+
+
+Papers that address energy efficiency through the study of the data used in the AI pipeline. ▷▷\triangleright 8 out of 98 papers.
+
+
+Pipeline: 
+
+
+Studies looking at the whole AI pipeline. ▷▷\triangleright 3 out of 98 papers.
+
+
+Other: 
+
+
+Publications dealing with CPU, architecture, and framework. ▷▷\triangleright 4 out of 98 papers.
+
+
+General: 
+
+
+The papers do not specify a particular artifact and address AI systems as a whole. ▷▷\triangleright 24 out of 98 papers.
+
+
+
+
+
+Figure 9. Number of publications per studied artifact.
+
+
+
+
+3.10. Algorithm Types
+
+By considering the primary studies which focus on a specific algorithm (▷▷\triangleright 51 out of 98 papers.), we note that the vast majority focus on neural networks (▷▷\triangleright 41 out of 98 papers.). Only a much smaller fraction focuses on algorithms of different nature, such as decision trees (▷▷\triangleright 5 out of 98 papers.), genetic algorithms (▷▷\triangleright 1 out of 98 papers.), or logistic regression models (▷▷\triangleright 5 out of 98 papers.).
+
+
+Regarding the deep neural network algorithms, we also note a further characterization of this field, with 8 studies focusing on convolutional neural networks, one on transformers, and one on spiking neural networks. We also observe three algorithms that appear only once in the Green AI literature (Other category, ▷▷\triangleright 3 out of 98 papers.), namely genetic algorithms, logic regression algorithms, and stochastic gradient descent algorithms.
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI algorithm types
+\faLeaf Most Green AI primary studies are algorithm-agnostic or focus on neural networks. A small fraction uses decision trees.
+
+
+\endMakeFramed
+
+
+
+
+3.11. Data Types Used
+
+Regarding the types of data used in the Green AI body of literature, an overview of their distribution is reported in Figure 10. From the figure, we can observe that the recurrence of data types across primary studies is:
+
+Image data: 
+
+
+▷▷\triangleright 42 out of 98 papers.
+
+
+Textual data: 
+
+
+▷▷\triangleright 22 out of 98 papers.
+
+
+Numeric data: 
+
+
+▷▷\triangleright 10 out of 98 papers.
+
+
+Video data: 
+
+
+▷▷\triangleright 4 out of 98 papers.
+
+
+Audio data: 
+
+
+▷▷\triangleright 2 out of 98 papers.
+
+
+
+
+
+From the distribution of data types, we notice that image data is by far the most used one, and is utilized by almost half of the studies in the body of literature. The second most utilized data type is textual data, which nevertheless appears approximately half as often as the image one. Other types of data result to be less recurrent, with only few studies utilizing audio data (e.g., lenherr2021Sep present a metric to measure the sustainability of Green AI by considering as case study the Intel MovidiusX processor, an embedded video processor with a Neural Engine for video processing and object detection \citePlenherr2021Sep).
+
+
+A rather high number of primary studies does not specify any kind of data (Not specified category, ▷▷\triangleright 32 out of 98 papers.). This finding has to be primarily attributed to the position and theoretical papers included in the review (see also Section 3.4 and Section 3.5).
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI data types
+\faLeaf  Image data is the most used data type in Green AI studies, followed by textual and numeric data.
+
+
+\endMakeFramed
+
+
+Figure 10. Occurrence of data types used in the Green AI literature.
+
+
+
+
+3.12. Dataset sizes
+
+Regarding the size of the datasets used in the papers, approximately half of the primary studies (▷▷\triangleright 48 out of 98 papers.)) directly reference the number of data points used. By inspecting such numbers, we note that the number of data points used to study and to evaluate Green AI algorithms and approaches varies greatly, and ranges from 1k data points \citePGondi2021Nov to 40M data points \citePGarcia-Martin2017. Almost half of the studies reporting the number of data points (▷▷\triangleright 25 out of 48 papers) utilize data points in the order of thousands (1​k≤#​d​a​t​a​p​o​i​n​t​s≤70​k1𝑘#𝑑𝑎𝑡𝑎𝑝𝑜𝑖𝑛𝑡𝑠70𝑘1k\leq\#datapoints\leq 70k), while the remaining (▷▷\triangleright 23 out of 48 papers) use one million data points or more (1​M≤#​d​a​t​a​p​o​i​n​t​s≤40​M1𝑀#𝑑𝑎𝑡𝑎𝑝𝑜𝑖𝑛𝑡𝑠40𝑀1M\leq\#datapoints\leq 40M).
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI dataset sizes
+\faLeaf  Dataset sizes range from 1k to 40M data points, with approximately half of the studies utilizing 1M or more data points.
+
+
+\endMakeFramed
+
+
+
+
+3.13. Research Strategies
+
+By considering the research strategies (Stol and Fitzgerald, 2018) utilized in the Green AI literature, the distribution of the various strategies, according to the collected primary studies, is reported in Figure 11.
+
+
+Figure 11. Occurrence of research strategies used in the Green AI literature.
+
+
+The majority of paper results adopt laboratory experiments (▷▷\triangleright 73 out of 98 papers.), while only a fraction uses other research strategies, such as field experiments (▷▷\triangleright 6 out of 98 papers.), i.e., experiments conducted in pre-existing settings and computer simulations, i.e., “in silico” simulations conducted in a nonempirical setting (▷▷\triangleright 5 out of 98 papers.). As examples, Liu et al. \citePliu2019 use a field study to assess a green software stack for computer vision of autonomous robots, while Yosuf et al. \citePyosuf2021 leverage computer simulations to study how virtualized cloud fog networks can be used to improve AI energy efficiency. The 12 papers not displaying any research strategy correspond to the position papers (cf. the “None” category in Figure 11).
+
+
+\MakeFramed\FrameRestore
+
+
+Green AI Research Strategies
+\faLeaf  Most Green AI studies use laboratory experiments, while only a minority adopt other research strategies, such as field experiments and computer simulations.
+
+
+\endMakeFramed
+
+
+
+
+3.14. Energy savings
+
+By considering the energy savings reported achievable via Green AI strategies, we note that only approximately a third of the primary studies explicitly document them (▷▷\triangleright 27 out of 98 papers.). Out of all Green AI strategies, among the ones which report concrete saving percentages, a technique based on structure simplification for deep neural networks results to save more energy, amounting to 115% energy savings \citePZhang2018. The other techniques which result to optimize energy the most are based on quantizing the inputs of decision trees \citePabreu2020 (97% energy savings), using data-centric Green AI techniques \citePVerdecchia2022DataCentricGreenAI (92% energy savings), and leveraging efficient deployment of AI algorithms via virtualized cloud fog networks (91% energy savings) \citePyosuf2021. Overall, more than half of the papers explicitly reporting energy saving percentages report a saving of at least 50% (▷▷\triangleright 17 out of 27 papers), while only a minor number savings between 13% and 49%.
+
+
+\MakeFramed\FrameRestore
+
+
+\faLeaf
+Green AI energy savings
+Studies report energy savings between 13% and 115% energy savings, with more than half of the papers reporting savings of at least 50%.
+
+
+\endMakeFramed
+
+
+
+
+3.15. Industry involvement
+
+Regarding the industry involvement in Green AI scientific publications (see also Section 2.2.4), an overview of the authorship of the Green AI primary papers is depicted in Figure 12.
+
+
+Figure 12. Industry involvement.
+
+
+From the figure, we can note that most Green AI studies are authored exclusively by academic researchers (▷▷\triangleright 75 out of 98 papers.), while also a considerable portion, amounting almost to a fourth of all primary studies, are authored by a mix of academic and industrial researchers (▷▷\triangleright 20 out of 98 papers.). Green AI studies written exclusively by industrial authors appear only in rare instances (▷▷\triangleright 3 out of 98 papers.).
+\MakeFramed\FrameRestore
+\faLeaf
+Industry involvement
+Most studies are written by academic authors, while a minor portion by a mix of academic and industrial authors. Green AI studies written exclusively by academic authors are very rare.
+\endMakeFramed
+
+
+
+
+3.16. Intended readers
+
+By considering the intended readers of the Green AI scientific literature, the vast majority targets academic readers (▷▷\triangleright 85 out of 98 papers.), while a much smaller portion both academic and industrial readers (▷▷\triangleright 8 out of 98 papers.). Despite scientific papers targetting intuitively a specialized audience, among the Green AI literature, few studies are intended also for the general public (▷▷\triangleright 5 out of 98 papers.). For example, Dhar et al. \citePdhar2020, present an intuitive yet thoroughly positioned article on the systemic effect of AI on carbon emissions. Interestingly, among the primary studies, few are intended also for policymakers, i.e., aim to sensibilize government stakeholders to consider issues related to Green AI. For example, in a paper by Rohde et al. \citeProhde2021, how opportunities and risks for the environment, economy and society associated with AI can be governed are discussed.
+
+
+\MakeFramed\FrameRestore
+
+
+\faLeaf
+Intended readers
+The vast majority of Green AI studies are targetting academic readers, while a much smaller portion targets both academic and industrial readers. A handful of studies, especially position papers, are intended for the general public.
+
+
+\endMakeFramed
+
+
+
+
+3.17. Tool Provision
+
+Among the primary studies collected for this literature review on Green AI, only a small fraction (▷▷\triangleright 15 out of 98 papers.) makes tools available to tackle Green AI. The tools provided are of heterogeneous nature, and range from tools to monitor the resource efficiency of AI algorithms \citePguldner2021, to tools optimizing the energy efficiency for stochastic edge inference \citePkim2020, and implementations of convolutional neural networks optimized for energy efficiency \citePmehta2019.
+
+
+\MakeFramed\FrameRestore
+
+
+\faLeaf
+Green AI Tool Provision
+Albeit numerous studies provide solution to tackle Green AI, only a fraction of them makes tools based on the solutions readily available online as an implemented tool.
+
+
+\endMakeFramed
+
+
+
+
+
+
+4. Discussion
+
+The consolidated and still growing Green AI publication trend. From the analysis of the publication trends a clear picture emerges. The topic is gaining increasing traction in the academic community, especially if the latest years are considered (from 2020 onward). Despite being a quite new research topic (with the first paper on Green AI being published in 2015), the socio-environmental relevance of the topic seems to be reflected in its targeted publication venues. With conferences and journal being the most recurrent Green AI publication venues, the Green AI research field seems to have positioned and consolidated itself quite quickly within AI research communities.
+
+
+A definition of Green AI. From the results regarding how the term “Green AI” is used in the literature a clear picture emerges. Most Green AI studies consider Green AI as exclusively related to energy efficiency. Only fewer studies examine the influence of AI on greenhouse gas emissions (C​O2𝐶subscript𝑂2CO_{2}), and an even minor fraction examines the holistic impact that AI has on the natural environment.
+
+
+By considering the different levels of abstraction (namely energy efficiency, carbon footprint, and environmental footprint) the higher, more encompassing level, of environmental footprint seems best fitted to define the field of Green AI. In fact, as demonstrated in recent literature, reducing the environmental impact of AI exclusively to energy consumption has to be deemed as overly simplistic process (Luccioni and Hernandez-Garcia, 2023). Similarly, as green resources are sustainable but not infinite (Verdecchia et al., 2022), the field of Green AI has to account also for the multifaceted environmental impact AI can have, other than C​O2𝐶subscript𝑂2CO_{2} emissions alone. Based on these considerations, we define the field of Green AI as follows:
+
+
+
+“Green AI regards practices aimed at utilizing AI to mitigate the impact that humans have on the natural environment in terms of natural resources utilized, and/or mitigating the impact that AI itself can have on the natural environment.”
+
+
+
+On one hand, the definition above perfectly fits the studies focusing on the holistic impact that Green AI has on the natural environment. On the other hand, given its encompassing nature, the definition is also suited for studies focusing on lower abstraction levels of sustainability, such as Green AI C​O2𝐶subscript𝑂2CO_{2} emissions and energy consumption. In the latter case however, the definition also acts as a word of warning: while studying the lower levels of Green AI is paramount, only by considering the totality of the heterogeneous natural resources utilized by AI can we really understand the environmental impact of AI.
+
+
+The transdisciplinary topics of Green AI (with gaps). The 13 different topics we discover in this review emphasize that Green AI is a broad field that needs to be tackled as a transdisciplinary field. Some topics are naturally tied to training strategies (e.g., monitoring, hyperparameter tuning, algorithm design). However, there are other topics that take Green AI outside the training realm.
+
+
+This is the case for example of Deployment, Libraries, and Estimation that promise to be relevant in enabling Green AI. We argue that other disciplines need to be involved. For example, Software Engineering which has been dealing with these topics for traditional software systems. As highlighted by Cao et al. in their work on estimation \citePCao, one cannot expect existing strategies for traditional software to address the new challenges of AI-based systems. Conversely, only a few Green AI papers \citePGeorgiou2022May,McIntosh2019Mobile,Hampau2022 come from software engineering venues.
+
+
+Our analysis also shows that the topics Estimation and Emissions are under-represented, with six and five papers, respectively. We argue that more work is quintessential in these topics to help scientists and practitioners report the carbon footprint of their AI models in a seamless way.
+
+
+We showcase that papers under the topic Policy are only covered by position papers. We find this finding disconcerting: new policies to encourage Green AI within both industry and academic contexts need to be backed up with reliable evidence. Hence, we need more observational and solution papers that tackle this topic in the near future.
+
+
+The same issue is present in Emissions – only one paper is observational and the remaining are position. It might be the case that computing the climate impact of AI is far from trivial and it is easier said then done. Again, this is a call for the community to take action. It is not enough to ask big companies to provide their data on carbon impact – we also need to provide strategies and solutions to make it standard and straightforward.
+
+
+The fundamental Green AI research unbounded from application domains. From the collected results we deduce that, in order to improve the environmental sustainability of AI, it is often not necessary to focus on a specific domain. This implies that frequently fundamental aspects of Green AI are still open to investigation, and results can then be ported from a generic setting to specific domains. However, from the obtained results, we also note that the increasing distribution of digital infrastructures to achieve environmental sustainability (Verdecchia et al., 2022) might have played a role in Green AI research, with edge computing being the most considered specific domain.
+
+
+The high emphasis on the AI training phase. The results regarding the AI pipeline phases considered in the literature unequivocally point to training as the most studied phase. Albeit the training phase is intuitively the most energy-greedy phase, this results calls for a word of caution. From recent results (e.g., a study on data-centric Green AI \citePVerdecchia2022DataCentricGreenAI) the inference phase results to consume only a negligible fraction of the energy consumed in the training phase. Nevertheless, given the high execution rate of the inference phase, how the energy consumed by the infrequent execution of the training phase compares to one of the highly executed inference phase is still an open question. As a call for action, studies should be conducted by considering the energy consumed throughout the whole life cycle of AI models, from their training to inference phase, till their eventual deprecation.
+
+
+Image datasets as primary Green AI data source. By considering the data types used in Green AI studies, we note that the vast majority of the literature uses image data. To the best of our knowledge, this choice is not guided by any specific research design choice (e.g., AI models based on image data being the most used in practice, or being the most energy greedy ones). For this reason, we conjecture that the popularity of utilizing image data for Green AI data is mostly driven by convenience, either because past work focused on such data by chance, image datasets are more accessible/standardized with respect to other ones, or more off the shelf image AI models/libraries are currently available. Regardless of the cause, this result points to the need of utilizing more heterogeneous data types, rather than focusing primarily on image data, in order to gain a holistic understanding of Green AI.
+
+
+Laboratory experiments guided till now Green AI. The most common research strategy adopted for Green AI studies clearly emerges from the literature as being laboratory experiments. Given the fast popularization and consolidation of the Green AI research field, from this review it seems as if the time is suitable to shift the focus to other research strategies, e.g., field experiments and case studies. This would not only allow to change the considered context from an in vitro to an in vivo setting, but also to bridge potential gaps between academic research and industrial practice.
+
+
+The highly promising energy savings of Green AI. From the results of this review, we deduce that the research field of Green AI is highly promising, with more than half of the papers reporting 50% or more energy savings. This study focuses on the state of the art of Green AI, rather than focusing on the state of practice. It would be therefore interesting to understand, as future work, the extent to which this encouraging results are transposed to industrial practice, and the potential impediments which hinder their adoption or full potential.
+
+
+A noticeable industry involvement. Regarding industry involvement in Green AI studies, the results gathered from this review are promising. The authorship of Green AI literature results to be to a good extent shared between academic and industrial researchers/practitioners. This finding might highlight the sensibility of industry towards Green AI concerns, and/or the importance of moving towards more environmentally sustainable AI practices.
+
+
+As a potential impediment to the industrial adoption of Green AI research, our results point to a low recurrence of studies targeted towards practitioners. While numerous journals are explicitly aimed at practitioners, e.g., IEEE Software222https://www.computer.org/csdl/magazine/so. Accessed 22nd December 2022., only few studies on Green AI included in our review target them. This result might point to the fact that the Green AI interest is still primarily focused towards academic activities, while the authorship showcases a rather high interest of industry. As take away, similar to the considerations made for the Green AI research strategies, it might be the right moment to consider a higher involvement of industry in Green AI, which results to date to be a research area still targeted primarily towards academic readers.
+
+
+Green AI lacks tool support. Finally, from this review, we note that the current situation regarding the provisioning of Green AI tools is not bright. Albeit the majority of the studies present Green AI solutions, only a small fraction of them makes the solutions available as a tool. We conjecture that this result might either point towards (i) a fast-paced nature of Green AI research, in which results are rapidly deprecated, and hence tools are not meaningful, or (ii) an immaturity of the research field, which still requires a solid empirical foundation on which tools can be built upon.
+
+
+
+
+
+5. Threats to Validity
+
+In this section, we discuss the threats to validity of our study.
+To ensure the quality of the results, we established a well-defined research protocol to proceed with the data collection. In addition, throughout our study, we followed the recommendations of the guidelines for conducting a systematic literature review (Kitchenham, 2004; Wohlin, 2014; Mayring et al., 2004; Kitchenham and Brereton, 2013; Petersen et al., 2015). We designed and carried the different reviewing processes according to the rigorous protocol we established after the guidelines and described in Section 2. Nevertheless, some threats to validity can still exist even with our best efforts. In the following, we present the threats which could have influenced our study, jointly with the strategies we adopted to mitigate them.
+
+
+External validity
+The main threat to external validity is that the literature collected and analysed in this study is not sufficiently representative. To avoid this situation, we surveyed three prominent literature indexers through an automatic query (i.e., Google Scholar, Scopus, and Web of Science), and left the year of publication unbounded, to reduce the probability of missing any relevant publication. In addition, the search query was designed to target relevant literature directly with specific keywords, while allow for flexibility by considering similar, complementary, and variation of the keywords (e.g., the keywords green, sustainability, and sustainable). We also mitigated the threat of having an incomplete set of studies, as well as the threat associated with the specificity of the terms used in the search query, by performing a complementary iterative bidirectional snowballing process of the query results. This latter search strategy allowed us to include literature related to our query that was not directly referencing any of the automated search keywords.
+We limited our review of the literature to peer-reviewed studies, to moderate the threat about the low quality of the set of primary studies. We deem that such practice does not constitute an additional threat, as peer-review is a standard requirement of high-quality publications.
+
+
+Internal validity
+To address potential threats to internal validity, we established a rigorous research protocol a priori, and we followed it to conduct all the research activities. Subjective biases and interpretations were mitigated by closely complying with the selection criteria to evaluate the studies.
+Moreover, weekly meeting were held during the selection process to jointly discuss examples, doubts, and to align the selection process between the three researchers.
+
+
+Construct validity
+To ensure that the set of studies answered our research questions, we applied a priori carefully constructed inclusion and exclusion criteria to strictly control the manual selection of studies. We then used the bidirectional snowballing technique to expand the range of relevant primary studies to a more comprehensive set.
+
+
+Conclusion validity
+Possible sources of bias arising from the data extraction and analysis phases were mitigated by strict compliance with an a priori defined protocol, explicitly tailored to collect the data needed to answer our research questions. In all, we followed the best practises of the standard guidelines for systematic literature reviews (Kitchenham, 2004; Wohlin, 2014; Mayring et al., 2004; Kitchenham and Brereton, 2013; Petersen et al., 2015).
+Lastly, we documented all the data throughout the whole review process and made them available for reproducibility and replicability purposes (see Section 1).
+
+
+
+
+
+6. Related Work
+
+Despite the growing interest around Green AI, the topic has been marginally considered only in a handful of reviews. The related work manly investigates the topic as an intersection of AI and environmental sustainability, or by defining it as a specific subdomain of software engineering. To the best of our knowledge, this review is the first aiming towards a comprehensive review of Green AI research and its characteristics.
+
+
+In a recent publication, Natarajan et al. perform a systematic literature review on the topics of ‘AI for Environmental Sustainability’ as well as ‘Environmental Sustainability of AI’. The authors present the affordances of the use of AI for sustainability that they extracted from the literature (Natarajan et al., 2022). ‘AI affordances’ are introduced as the posible actions offered by AI artifacts to an organizational actor whose goal is to achieve environmental sustainability. The authors point out the focus of previous research on the technical side, and they advocate for a further exploration of the concept of sustainable AI affordances from a socio-technical perspective. The literature is exclusively analyzed with respect to building the AI affordances, and other characteristics of the state-of-the art of Green AI are considered nor discussed in the study.
+In contrast, our review focuses on the sustainability of AI, and maps the entirety of the Green AI literature. In our review, we aim at providing a detailed and comprehensive overview of the characteristics of the Green AI state-of-the-art research (e.g., topic, domain, type of study, targeted artifact, overview of energy savings, tool provision, industrial involvement). Therefore, in contrast to the work of Natarajan et al. (Natarajan et al., 2022), we consider the different facets of Green AI, rather than exclusively on AI affordances, leading to a more holistic review of Green AI, and a higher number of considered primary studies (98 versus 41 papers).
+This difference could be explained by the fact that their review only includes papers involving consumer products and services and excludes papers dealing with non-commercial applications, whereas we provide an overview of the whole field of Green AI.
+
+
+Previous literature reviews consider Green AI research by focusing exclusively on specific subdomains of AI and application subdomains of Software Engineering, e.g., deep learning (Xu et al., 2021), information retrieval (Scells et al., 2022), or embedded systems (Mittal, 2019). In contrast, our research aims to review the entirety of the Green AI literature, regardless of the specific AI or software engineering subdomain it focuses on.
+
+
+In the survey of Xu et al. (Xu et al., 2021), the authors provide an overview of the approaches aimed at improving the environmental sustainability of deep learning. The authors map the different approaches using a taxonomy of the deep learning life cycle stage and its related artifacts. In contrast to such study, in this review we target a higher number of Green AI characteristics (see Section 2.2.4), and target the entirety of Green AI literature, rather than exclusively the one on deep learning.
+
+
+Scells et al. (Scells et al., 2022) provide a literature review on methods related to the domain of Green Information Retrieval. The authors explain that the domain of Information Retrieval (IR) produces relatively low emissions compared to other research domains, but they also warn that similar trends of costs and environmental impact may appear considering the growing development of new IR-focused deep learning models.
+Natural Language Processing and Machine Learning are also discussed, but only with respect to the Information Retrieval domain. Therefore, they are not addressing the whole field of AI, as done in this review.
+
+
+Finally, the optimizations that can be made for the implementation of deep learning models on the specific platform of NVIDIA Jetson are reviewed with a focus on energy efficiency by Mittal (Mittal, 2019). The review covers studies at both the hardware and software level. Nevertheless, the review addresses only the Jetson platform 333https://developer.nvidia.com/embedded-computing. Accessed 23th December 2022.. We differentiate ourselves from this study by providing a holistic review of Green AI, rather than focusing exclusively on deep learning.
+
+
+
+
+
+7. Conclusion
+
+In this systematic literature review, we aimed at characterizing the existing body of research in Green AI. We identified 98 peer-reviewed publications that show a significant growth in this research field since 2020.
+
+
+We provide an encompassing overview and characterization of the different topics being addressed by Green AI papers. We identified 13 different Green AI topics, showcasing that the spotlight falls on monitoring, hyperparameter-tuning, model benchmarking, and deployment. Less frequent topics – such as data-centric, estimation, and emissions – show less obvious approaches that deserve further research in the upcoming years.
+
+
+The potential of Green AI cannot be disregarded: the majority of publications show significant energy savings, up to 115%, at little or no cost in accuracy. However, we argue that most publications revolve around laboratory studies. More field experiments are quintessential to help AI practitioners embrace green strategies that are effective, feasible, and mensurable. This is also reflected in the small participation of the industry in these studies – only 23% of publications involve industry partners.
+
+
+At the same time, we conclude that the field seems to be reaching a considerable level of maturity. Hence, it is necessary to encourage the port of promising academic results to industrial practice.
+In other words, our study calls out for the importance of having reproducible research. Only a small fraction of solution papers offers a tool or software package that can be used by the community. We argue that Green AI is an urgent and necessary line of research that needs to grow fast and solid – non-replicable research can only slow us down.
+
+
+This review also serves as a foundation for future research that ultimately aims to reduce the climate impact of AI. In this respect, we see potential in follow-up grey literature or interview studies to understand how AI professionals are currently addressing the issue.

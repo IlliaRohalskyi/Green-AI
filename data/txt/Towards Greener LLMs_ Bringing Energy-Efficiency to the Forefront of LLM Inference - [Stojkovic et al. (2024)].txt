@@ -1,0 +1,360 @@
+Abstract:
+
+Abstract
+With the ubiquitous use of modern large language models (LLMs) across industries, the inference serving for these models is ever expanding.
+Given the high compute and memory requirements of modern LLMs, more and more top-of-the-line GPUs are being deployed to serve these models.
+Energy availability has come to the forefront as the biggest challenge for data center expansion to serve these models.
+In this paper, we present the trade-offs brought up by making energy efficiency the primary goal of LLM serving under performance SLOs.
+We show that depending on the inputs, the model, and the service-level agreements, there are several knobs available to the LLM inference provider to use for being energy efficient.
+We characterize the impact of these knobs on the latency, throughput, as well as the energy.
+By exploring these trade-offs, we offer valuable insights into optimizing energy usage without compromising on performance, thereby paving the way for sustainable and cost-effective LLM deployment in data center environments.
+
+
+
+
+I Introduction
+
+
+Modern generative large language models (LLMs) are turning ubiquitous in their use-cases, leading to large-scale inference deployments. This has lead the datacenter expansion to hit an energy wall for the foreseeable future [6], further delaying the green energy promises.
+At the same time, such large scale deployments of these models present a unique opportunity to optimize the service for energy efficiency with huge impacts.
+Previous work in the field of LLM inference platforms has focused on improving latency and throughput of the serving platforms.
+However, we note that just like any other service, even LLM inference has periods of lower utilization, leading to slack time compared to the latency and throughput SLOs.
+We use this insight to explore various energy efficiency knobs available to the inference service provider.
+
+
+LLM inference environments have various sources of inefficiency.
+Prior work attacked some of the largest ones, such as
+inefficient request scheduling and batching [1, 30, 39],
+memory management and key-value caching of intermediate results [22, 3], speculative decoding [27] or model parallelism [24].
+
+
+However, one aspect that has been largely overlooked is the energy consumption of LLM inference servers.
+Despite the widespread use of LLMs and their serving engines, there is a notable absence of a comprehensive framework for managing energy in these systems.
+While existing research has highlighted the unique performance challenges of LLM inference servers,
+understanding how these issues translate into power and energy consumption, as well as designing effective power management strategies, remains largely unexplored.
+Advancing research in this area is critical,
+as LLM services are an increasing fraction of data center loads [12],
+and data centers contribute substantially to the world energy
+consumption [26, 4] and
+carbon footprint [15, 14].
+
+
+To address this shortcoming with current LLMs and inference platforms, this paper performs a thorough characterization of energy consumption in LLM inference environments under various settings.
+The goal of the characterization is to generate datasets that can provide insights and guide the design of future energy management frameworks specifically designed for LLM inference servers.
+
+
+Our characterization shows that LLM inference environments pose a set of challenges not met
+by the existing power and energy management schemes designed for traditional latency-critical data-center
+applications ( [8, 41, 19, 25, 16, 17, 28, 7]).
+First,
+a fundamental challenge lies in the variable nature of loads encountered by LLM inference servers, akin to user-facing applications.
+However, the requests for LLM models exhibit a remarkable diversity, with inputs ranging from short (a few tokens) to long (a few thousands of tokens)
+and outputs displaying similar variability.
+Longer inputs necessitate increased GPU parallelism, resulting in extended prefill phases,
+while longer outputs induce multiple iterations and elongated decode phases.
+It is known that prefill phase puts more pressure on the compute resources, while decode phase puts more pressure on the memory subsystem [30, 31].
+Consequently, bursts of requests of one type manifest distinct behaviors compared to those of another type, complicating load and energy management strategies.
+
+
+Second,
+LLM inference servers can be organized into various configurations concerning the degree and type of parallelism, batch sizes, and GPU frequencies.
+Each configuration may be optimal for specific system states.
+For instance, low loads of requests with short inputs and outputs may operate at lower GPU frequencies and with fewer GPUs (smaller degrees of tensor/pipeline parallelism).
+On the other hand, high loads of requests with long inputs and outputs require high GPU frequencies and many GPUs (larger degrees of tensor/pipeline parallelism).
+Yet the rapid fluctuations in load and
+software-level overheads
+exacerbate the challenges associated with transitioning between configurations. For instance, adjusting GPU frequency via the CPU controller incurs significant stalls, while re-sharding the model into a new pipeline or tensor organization proves to be prohibitively expensive in terms of computational resources and time.
+
+
+To effectively manage energy consumption in LLM inference environments, it is imperative to develop strategies that accommodate the dynamic and heterogeneous nature of workload characteristics. These strategies must incorporate mechanisms for adaptive resource allocation, ensuring that computational resources are efficiently utilized in response to evolving workload demands. Additionally, optimizations aimed at minimizing the overhead of configuration changes, such as GPU frequency adjustments and model reorganization, are vital for enhancing energy efficiency without compromising inference performance. By addressing these challenges, we can pave the way for the development of sustainable and energy-efficient LLM inference systems, thereby facilitating their widespread adoption across various domains.
+
+
+Contributions of this paper are as follows:
+
+
+•
+
+Characterization of the LLM inference environments from the perspective of energy efficiency.
+
+
+
+•
+
+Analysis of available knobs to LLM inference servers and their impact on the performace-energy trade-off.
+
+
+
+•
+
+An outline of the requirements for an energy-efficient LLM inference framework.
+
+
+
+
+
+
+
+
+II Background
+
+
+
+II-A LLM overview
+
+
+Modern LLMs are predominantly built upon transformer architectures [38], which have revolutionized natural language processing tasks.
+These transformer models leverage attention mechanisms and multi-layer-perceptron (MLP) layers to effectively
+process inputs and generate corresponding outputs.
+The architecture of transformer-based LLMs can vary, with configurations such as encoder-only [10],
+decoder-only [35],
+or encoder-decoder [36] models.
+In encoder-only models, the input text is processed to create contextualized representations, which are then utilized for downstream tasks.
+Conversely, decoder-only models focus on generating output sequences based on given inputs, leveraging the context encoded in the input embeddings.
+Encoder-decoder models, on the other hand, combine both encoder and decoder components, enabling tasks like machine translation and text summarization where the model processes input text and generates corresponding output text.
+In this paper we focus on
+generative LLMs which are usually
+either decoder-only or encoder-decoder models.
+The models are auto-regressive, where each output token is generated sequentially with a forward pass of the model.
+
+
+
+
+II-B Batching and parallelism
+
+
+LLM inference batching refers to the process of grouping multiple input sequences together and processing them simultaneously during inference, exploiting this parallelism to improve efficiency. Moreover, batching enables better hardware utilization, leveraging the capabilities of modern computational resources such as GPUs and TPUs more effectively. By enhancing inference speed and resource utilization, batching plays a crucial role in scaling up LLM deployment for various applications, and making it energy-efficient.
+
+
+Another widely used mechanism to increase throughput of LLM inference is the parallelism or sharding of the model across GPUs.
+Tensor parallelism divides the model’s parameters across multiple devices, such as GPUs or TPUs, for parallel computation per layer in the model inference. This approach optimizes hardware utilization, accelerating inference by distributing computations in each layer. Pipeline parallelism splits the model’s layers or modules into stages, executing them sequentially across different devices. By overlapping computation and communication, it minimizes idle time and maximizes throughput. Together, tensor and pipeline parallelism enable efficient and scalable LLM inference, handling massive textual data effectively.
+
+
+
+
+II-C SLOs in LLMs today
+
+
+Modern LLMs are assessed based on performance SLOs, including Time to First Token (TTFT), Time Between Tokens (TBT), and throughput. TTFT measures the time for the model to generate the first token of the output sequence, especially important for interactive and streaming responses. TBT quantifies the time spent between each output token, as it is generated in an auto-regressive manner.
+Meeting these SLOs is crucial for ensuring timely and efficient responses across a range of applications, from chatbots to translation services, demanding careful optimization of model and hardware configurations.
+
+
+
+
+II-D Energy efficiency knobs in modern GPUs
+
+
+Modern GPUs do not offer the vast majority of efficiency knobs that the modern CPUs offer [32]. For instance, voltage scaling, fine-grained power gating, efficient modes, and fine-grained frequency scaling are not offered by the GPUs today.
+However, they do offer frequency control at a GPU-wide granularity.
+Lowering the frequency during periods of low activity reduces power consumption without sacrificing a lot of performance.
+
+
+
+
+
+
+III Methodology
+
+
+We present detailed characterization results on a recent open-source LLM Llama-2 with 70 billion parameters [37].
+Previous work has shown that other models like BLOOM-176B [34] closely correlate with each other in performance trends [30].
+We run our experiments on an NVIDIA DGX-H100 [29] using vLLM [23], a state-of-the-art open-source LLM inference platform.
+
+
+The maximum frequency for NVIDIA H100 is 1980 MHz. We run our experiments on H100 with frequency varying between 800 MHz to 1980 MHz in jumps of 200 MHz.
+Unless specified otherwise, the experiment runs using 8-way tensor parallelism.
+For latency SLOs, we choose 5×5\times the TTFT and TBT achieved when running the request alone, without any batching or queuing delay.
+
+
+
+
+
+IV Energy efficiency trade-offs
+
+
+At the platform level, we explore 3 levers:
+
+
+1. workload type,
+
+2. batching, and
+
+3. model parallelism.
+
+
+
+
+We define the workload type as a combination of the input and output lengths of the queries, combined with the total requests per second being sent to a model instance. We consider this a lever for the platform, since several scheduling and scaling algorithms at the service’s cluster can define these properties as seen at a model instance.
+We combine these levers with the only energy-efficiency knob available to us in modern GPUs at a node-level: frequency scaling.
+
+
+Figure 1: Normalized TTFT varying GPU frequencies for different inputs/outputs.
+
+
+Figure 2: Normalized TBT varying GPU frequencies for different inputs/outputs.
+
+
+Figure 3: Maximum throughput of an 8-way tensor-parallel GPU LLama2 instance with different GPU frequencies for different input/output types.
+
+
+Figure 4: Normalized power consumption of an 8-way tensor-parallel GPU LLama2 instance with different GPU frequencies for different request types.
+
+
+Figure 5: Normalized energy consumption of an 8-way tensor-parallel GPU LLama2 instance with different GPU frequencies for different request types.
+
+
+
+IV-A Impact of workload type
+
+
+We divide the workload into buckets based on the input and output length in number of tokens. Both input and output lengths are divided into three buckets: Small (100 tokens for input and 50 tokens for output), Medium (500 and 128 tokens for input and output respectively), and Large (1024 tokens for input, 256 tokens for output).
+Combining the input and output lengths from different buckets gives us 9 types of input/output workload types.
+We run a streaming workload through the model instance.
+
+
+Latency
+Figures 1 and 2 show the impact of the frequency setting on the TTFT and TBT latency metrics for the different workload types.
+As the input length increases, the computational intensity of the prefill phase increases.
+Therefore, we see a clear pattern, where the TTFT gets increasingly impacted by frequency and lowering as the prompt length increases.
+In fact, the large inputs increase the computational intensity enough to cause throttling due to power overdraw - this reduces the impact of frequency capping on large inputs.
+Furthermore, longer output lengths running at lower frequency increase the queuing time, adding to the TTFT.
+On the other hand, the decode phase is memory bound, and growing the input or output length has an imperceptible impact on the TBT’s frequency response (Figure 2).
+
+
+Throughput
+Figure 3 shows the maximum throughput achievable under the SLOs for various workload types while changing their frequency.
+We note that the throughput is heavily affected by both the input and output lengths.
+Longer inputs lead to higher TBT for the requests that get their decode phase batched with the prefill phase.
+Longer outputs lead to queuing delay as the model instance spends more number of iterations on each request.
+The small input and small output setup achieves the highest throughput and reducing the frequency by half, only reduces the throughput by ∼similar-to\sim20%.
+
+
+Energy
+Figure 4 shows the maximum power draw for different workload types with frequency capping.
+Each data point is shown at a medium load the corresponding configuration can support.
+Comparing Figure 4 with  Figures 1, 2 and 3 shows that we can achieve ∼similar-to\sim20% lower power for most configurations without any impact to the latency or throughput.
+Furthermore, if the workload is going through a low utilization phase, the power required can be reduced even further, at no impact to the workload.
+
+
+Figure 5 shows the corresponding energy consumption.
+It is evident that optimizing for power vs energy vs performance would lead to very different frequency configurations for the inference platform.
+
+
+
+
+IV-B Impact of parallelism
+
+
+Next, we vary the tensor parallelism degree across different number of GPUs under medium load and medium input/output workload types. Tensor parallelism divides the KV heads of the model equally across the GPUs.
+Therefore, we use tensor parallelism degrees of 2, 4, and 8 within a single DGX-H100 node, and name these configurations TP2, TP4, and TP8.
+
+
+Latency
+Figures 6 and 7 show that increasing parallelism reduces both TTFT and TBT as tensor parallelism effectively parallelizes computation within the layers.
+However, as communication overhead also grows, larger parallelism does not achieve linear latency reduction.
+As computational intensity remains high during prefill phase, TTFT exhibits similar frequency responses across parallelisms.
+In contrast, increasing parallelism reduces the computation on each GPU during decode phase, TBT’s frequency impact further decreases.
+
+
+Throughput
+Figure 8 shows the maximum throughput achievable by each of the parallelism configurations under latency SLOs.
+As expected, the increase in throughput going from TP2 to TP4 is much higher (75%) compared to the increase from TP4 to TP8 (40%).
+In either case, if optimizing for cost per request, as long as TP2 meets the latency SLOs, having 2 instances of TP2 is better than TP4. Similarly, two instances of TP4 would be better than TP8.
+
+
+Energy
+Figures 9 and 10 show the maximum power and total energy consumption at medium load for each configuration. These are particularly interesting, since the normalized total energy for TP2 is only 40% lower than TP8, which being able to serve only 60% fewer requests.
+Furthermore, most cloud environments today only allow full node access (8 GPUs) to DGX-H100 nodes.
+This means that in times of lower throughput needs, it is more energy-efficient to run TP8 than TP2!
+
+
+
+
+IV-C Impact of batching
+
+
+As mentioned before, we use mixed batching of prefill and decode phases.
+We increase the maximum allowed batch size and observe the patterns in performance and energy with frequency scaling.
+
+
+Latency
+Figures 11 and 12 show the TTFT and TBT when batching.
+At maximum frequency, the TTFT slightly decreases as the maximum batch size is increased. This is due to reduction in queuing of the request before it gets batched in for inference. At lower frequencies, this effect is even more pronounced. With very low load, we see the opposite trend, where the TTFT increases due to increased computational complexity as the batch size increases.
+Since queuing delay does not impact TBT due to no preemption in this setup, we do not see such impact on the decode phase. Additionally, decode phase being memory-bound does not experience slow down as the batch size increases up to 64.
+
+
+Throughput
+Figure 13 shows the maximum throughput for different batch sizes.
+Since larger batches can lead to TTFT SLO misses, the throughput increase on doubling the batch size is not double. In fact, under SLOs, a batch size of 64 has only 7×\times higher throughput than a batch size of 4.
+
+
+Energy
+Figures 14 and 15 show the normalized maximum power and total energy observations. For most batch sizes, running the GPUs at 1.6​G​H​z1.6𝐺𝐻𝑧1.6GHz instead of 2​G​H​z2𝐺𝐻𝑧2GHz yields about the same throughput at less than 80% of the energy.
+Additionally, during phases of lower throughput needs in a service, reduce the maximum batch size can reduce consumed energy by up to 15%.
+
+
+Figure 6: TTFT of an GPU LLama2 instance under medium load and medium input/output request types with different GPU frequencies for different tensor parallelism strategies.
+
+
+Figure 7: TBT of a GPU LLama2 instance under medium load and medium input/output request types with different GPU frequencies for different tensor parallelism strategies.
+
+
+Figure 8: Maximum throughput of a LLama2 instance under medium inputs/outputs request types with different GPU frequencies for different tensor parallelism strategies.
+
+
+Figure 9: Normalized per-GPU power consumption of a LLama2 instance under medium load and medium input/output request types with different GPU frequencies for different levels of tensor-parallelism.
+
+
+Figure 10: Normalized total energy consumption of a LLama2 instance under medium load and medium input/output request types with different GPU frequencies for different levels of tensor-parallelism.
+
+
+Figure 11: Normalized TTFT of an 8-way tensor-parallel LLama2 instance under medium load and medium inputs/outputs request types with different GPU frequencies for different batch sizes.
+
+
+Figure 12: Normalized TBT of an 8-way tensor-parallel LLama2 instance under medium load and medium inputs/outputs request types with different GPU frequencies for different batch sizes.
+
+
+Figure 13: Maximum throughput of an 8-way tensor-parallel LLama2 instance under medium inputs/outputs request types with different GPU frequencies for different batch sizes.
+
+
+Figure 14: Normalized power consumption of an 8-way tensor-parallel LLama2 instance under medium load and medium inputs/outputs request types with different GPU frequencies for different batch sizes.
+
+
+Figure 15: Normalized energy consumption of an 8-way tensor-parallel LLama2 instance under medium load and medium inputs/outputs request types with different GPU frequencies for different batch sizes.
+
+
+
+
+
+
+V Related work
+
+
+LLM workload characterization
+A large body of work has characterized LLM inference workloads focusing on performance and utilization [18, 40].
+Moreover, some works have looked at LLM workloads from power[31], carbon [11], and energy [33] perspective.
+In light of this, it becomes evident that a holistic understanding of LLM inference workloads necessitates a comprehensive examination of their performance, energy efficiency, and environmental implications.
+Such an approach not only enables better resource management but also facilitates the identification of actionable optimization strategies and fine-tuning mechanisms for LLM inference serving.
+By bridging the gap between performance metrics, energy efficiency considerations, and actionable optimization strategies, this paper provides insights to researchers and practitioners
+to
+navigate the complexities of LLM inference workloads more effectively, ultimately contributing to more sustainable and efficient deployment of these
+models in real-world applications.
+
+
+Energy efficiency with hardware accelerators
+Other works have proposed the use of different models [13, 2] and different hardware [20, 21, 5] for energy efficient execution of transformer-based architectures. We focus on exposing and understanding energy efficiency of ubiquitous LLM inference infrastructures and immediately actionable knobs that require no changes in server’s hardware nor model’s architecture.
+
+
+Efficient LLM inference serving
+Many recent works propose to optimize cluster and node-level scheduling [1, 39, 30], memory and key-value cache management [23, 3, 9], and model parallelism[24] to improve inference efficiency. While these works focus on latency and throughput improvement, energy-efficient LLM serving exhibits distinct trade-offs and thus requires comprehensive understanding and solutions.
+
+
+
+
+
+VI Conclusion and Future Work
+
+
+In this work, we present a characterization of the impact of energy-efficiency knobs on various levers available to a modern LLM serving platform.
+We offer valuable insights into the difference between performance-optimized vs energy-optimized designs on the widely adopted model and hardware.
+We further show that there are platform decisions that can be made towards better energy-efficiency at no impact to the cost and performance.
+With this, we pave the way for orchestration and cluster and node-level scheduling work with more holistic optimization functions in future.

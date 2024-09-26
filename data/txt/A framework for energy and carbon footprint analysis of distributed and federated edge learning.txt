@@ -1,0 +1,626 @@
+Abstract:
+
+Abstract
+Recent advances in distributed learning raise environmental concerns due to the large energy
+needed to train and move data to/from data centers. Novel paradigms, such as
+federated learning (FL), are suitable for decentralized model training across devices or
+silos that simultaneously act as both data producers and learners. Unlike centralized
+learning (CL) techniques, relying on big-data fusion and analytics located in energy hungry
+data centers, in FL scenarios devices collaboratively train their models without sharing
+their private data. This article breaks down and analyzes the main factors that influence
+the environmental footprint of FL policies compared with classical CL/Big-Data algorithms
+running in data centers. The proposed analytical framework takes into account both learning
+and communication energy costs, as well as the carbon equivalent emissions; in addition, it models both vanilla and decentralized FL policies driven by consensus. The framework is evaluated in an industrial setting assuming a real-world robotized workplace. Results show that FL allows remarkable end-to-end energy savings (30%÷40%percent30percent4030\%\div 40\%) for wireless systems characterized by low bit/Joule efficiency (505050 kbit/Joule or lower). Consensus-driven FL does not require the parameter server and further reduces emissions in mesh networks (200200200 kbit/Joule). On the other hand, all FL policies are slower to converge when local data are unevenly distributed (often 2x slower than CL). Energy footprint and learning loss can be traded off to optimize efficiency.
+
+
+
+
+I Introduction
+
+
+Recent advances in machine learning (ML) have revolutionized many
+domains and industrial scenarios. However,
+such improvements have been achieved at the cost of large computational
+and communication resources, resulting in significant energy
+and CO2 (carbon) footprints. Traditional centralized
+learning (CL) requires all training procedures to be conducted inside
+data centers [1] that are in charge of collecting training data
+from data producers (e.g. sensors, machines and personal devices),
+fusing large datasets, and continuously learning from them [2].
+Data centers are thus energy-hungry and responsible for significant
+carbon emissions that amount to about 151515% of the global emissions of
+the entire Information and Communication Technology (ICT) ecosystem [3].
+
+
+An emerging alternative to centralized architectures is federated
+learning (FL) [4, 5]. Under FL, ML model
+parameters, e.g. weights and biases 𝐖𝐖\mathbf{W} of Deep
+Neural Networks (DNN), are collectively optimized across several resource-constrained edge/fog devices, that act as both data producers and local
+learners. FL distributes the computing task across many devices characterized
+by low-power consumption profiles, compared with data centers, and owning small datasets [2].
+
+
+Figure 1:  Centralized Learning (CL), Federated Learning (FL)
+with Parameter Server (PS), namely federated averaging (FA), and FL
+with consensus (i.e., without PS), namely consensus-driven federated
+learning (CFL).
+
+
+As shown in Fig. 1, using FL policies, such as
+federated averaging [5], allows devices to learn a local model under the orchestration of a centralized parameter server (PS). The
+PS fuses the received local models to obtain a global
+model that is fed back to the devices. PS functions are substantially
+less energy-hungry compared to CL and can be implemented at the network edge. This suggests that
+FL could bring significant reduction in the energy footprints, as the consumption is distributed across devices obviating the need for a large infrastructure for cooling or power delivery. However, vanilla
+FL architectures still leverage the server-client architecture which not only
+represents a single-point of failure, but also lacks scalability and, if not optimized,
+can further increase the energy footprint. To tackle these drawbacks,
+recent developments in FL architectures target fully decentralized
+solutions relying solely on in-network processing, thus replacing
+PS functions with a consensus-based federation model. In consensus-based
+FL (CFL), the participating devices mutually exchange their local
+ML model parameters, possibly via mesh, or device-to-device
+(D2D) communication links [2], and implement distributed
+weighted averaging [6, 7, 8]. Devices might
+be either co-located in the same geographic area or distributed.
+
+
+Contributions: the paper develops a novel framework for the
+analysis of energy and carbon footprints in distributed ML, including,
+for the first time, comparisons and trade-off considerations about vanilla
+FL, consensus-based (CFL) and data center based centralized learning.
+Despite an initial attempt to assess the carbon footprint for FL [3],
+the problem of quantifying an end-to-end analysis of the energy footprint still remains unexplored. To fill this void, we develop an end-to-end framework and validate it using real world data.
+
+
+The paper is organized as follows: Sections II
+and III describe the framework
+for energy consumption and carbon footprint evaluation of different
+FL strategies, and the impact of energy efficiency in terms of communication
+and computing costs. In Section IV, we consider
+a case study in a real-world industrial workplace targeting the learning
+of a ML model to localize human operators in a human-robot
+cooperative manufacturing plant. Carbon emissions are quantified and
+discussed in continuous industrial workflow applications
+requiring periodic model training updates.
+
+
+
+
+
+II Energy footprint modeling framework 
+
+
+The proposed framework provides insights into how different components
+of the FL architecture, i.e. the local learners, the core network
+and the PS, contribute to the energy bill. The learning system
+consists of K𝐾K devices and one data center (k=0𝑘0k=0). Each device
+k>0𝑘0k>0 has a dataset ℰksubscriptℰ𝑘\mathcal{E}_{k} of (labeled) examples (𝐱h,yh)subscript𝐱ℎsubscript𝑦ℎ(\mathbf{x}_{h},y_{h})
+that are typically collected independently. The objective of the learning system is to
+train a DNN model y^​(𝐖;𝐱)^𝑦𝐖𝐱\hat{y}(\mathbf{W};\mathbf{x}) that transforms
+the input data 𝐱𝐱\mathbf{x} into the desired outputs y^∈{yc}c=1C^𝑦superscriptsubscriptsubscript𝑦𝑐𝑐1𝐶\hat{y}\in\left\{y_{c}\right\}_{c=1}^{C}
+where C𝐶C is the number of the output classes.
+Model parameters are specified by the matrix 𝐖𝐖\mathbf{W} [5].
+The training system uses the examples in ⋃k=1Kℰksuperscriptsubscript𝑘1𝐾subscriptℰ𝑘\bigcup_{k=1}^{K}\mathcal{E}_{k}
+to minimize the loss function ξ​(𝐱h,yh|𝐖)𝜉subscript𝐱ℎconditionalsubscript𝑦ℎ𝐖\xi(\mathbf{x}_{h},y_{h}|\mathbf{W})
+iteratively, over a pre-defined number n𝑛n of learning rounds.
+
+
+Considering a device k𝑘k, the total amount of energy consumed by the learning process can be
+broken down into computing and communication components. The energy
+cost is thus modelled as a function of the energy Ek(C)superscriptsubscript𝐸𝑘CE_{k}^{(\mathrm{C})} due to computing
+per learning round, and the energy Ek,h(T)superscriptsubscript𝐸𝑘ℎTE_{k,h}^{(\mathrm{T})} per correctly
+received/transmitted bit over the wireless link (k,h𝑘ℎk,h).
+In particular, the latter can be further broken down into uplink (UL)
+communication (Ek,0(T)superscriptsubscript𝐸𝑘0TE_{k,0}^{(\mathrm{T})}) with the data center (or
+the PS), and downlink (DL) communication (E0,k(T)superscriptsubscript𝐸0𝑘TE_{0,k}^{(\mathrm{T})}),
+from the PS to the device. The energy cost for communication includes
+the power dissipated in the RF front-end, in the conversion, baseband processing
+and transceiver stages.
+We neglect the cost of on-off radio switching. In addition, communication
+energy costs are quantified on average, as routing through the radio access
+and the core network can vary (but might be assumed as stationary apart
+from failures or replacements). Finally, the energy Ek(C)superscriptsubscript𝐸𝑘CE_{k}^{(\mathrm{C})}
+for computing includes the cost of the learning round, namely the
+local gradient-based optimizer and data storage. In what follows,
+we quantify the energy cost of model training implemented either inside
+the data center (CL) or distributed across multiple devices (FL).
+Numerical examples are given in Table I and in the
+case study in Section IV.
+
+
+
+II-A Centralized Learning (CL)
+
+
+Under CL, model training is carried out inside the data center k=0𝑘0k=0, while the energy cost per round E0(C)=P0⋅T0⋅Bsuperscriptsubscript𝐸0C⋅subscript𝑃0subscript𝑇0𝐵E_{0}^{(\mathrm{C})}=P_{0}\cdot T_{0}\cdot B
+depends on the GPU/CPU power consumption P0subscript𝑃0P_{0} [3],
+the time span T0subscript𝑇0T_{0} required for processing an individual batch
+of data, i.e. minimizing the loss ξ(⋅|𝐖)\xi(\cdot|\mathbf{W}),
+and the number B𝐵B of batches per round. We neglect here the cost of initial dataset loading since it is a one-step process. For n=n​(ξ¯)𝑛𝑛¯𝜉n=n(\overline{\xi})
+rounds, and a target loss ξ¯¯𝜉\overline{\xi}, the total,
+end-to-end, energy in Joule [J] is given by:
+
+
+
+
+
+EC​L​(ξ)=γ⋅n⋅E0(C)+∑k=1Kb​(ℰk)⋅Ek,0(T),subscript𝐸𝐶𝐿𝜉⋅𝛾𝑛superscriptsubscript𝐸0Csuperscriptsubscript𝑘1𝐾⋅𝑏subscriptℰ𝑘superscriptsubscript𝐸𝑘0TE_{CL}(\xi)=\gamma\cdot n\cdot E_{0}^{(\mathrm{C})}+\sum_{k=1}^{K}b(\mathcal{E}_{k})\cdot E_{k,0}^{(\mathrm{T})},
+
+(1)
+
+
+where γ𝛾\gamma is the Power Usage Effectiveness (PUE) of the considered
+data center [10, 11]. The cost for UL communication
+for data fusion, ∑k=1Kb​(ℰk)⋅Ek,0(T)superscriptsubscript𝑘1𝐾⋅𝑏subscriptℰ𝑘superscriptsubscript𝐸𝑘0T\sum_{k=1}^{K}b(\mathcal{E}_{k})\cdot E_{k,0}^{(\mathrm{T})},
+scales with the data size b​(ℰk)𝑏subscriptℰ𝑘b(\mathcal{E}_{k}) of the k𝑘k-th local
+database ℰksubscriptℰ𝑘\mathcal{E}_{k} and the number of devices K𝐾K. PUE γ>1𝛾1\gamma>1
+accounts for the additional power consumed by the data center infrastructure
+for data storage, power delivery and cooling; values are typically
+γ=1.1÷1.8𝛾1.11.8\gamma=1.1\div 1.8 [11].
+
+
+TABLE I:  Computing costs and communication energy efficiency
+(EE) values for FL energy/carbon footprint evaluation.
+
+
+
+Parameters
+Data center/PS (k=0𝑘0k=0)
+Devices (k≥1𝑘1k\geq 1)
+
+
+Comp. Pksubscript𝑃𝑘P_{k}:
+
+140​W140W140\,\mathrm{W}(CPU)+ 42​W42W\,+\,42\,\mathrm{W}(GPU)
+
+5.1​W5.1W5.1\,\mathrm{W} (CPU)
+
+
+Batch time Tksubscript𝑇𝑘T_{k}:
+
+202020 ms
+
+190190190 ms
+
+
+Batches B𝐵B:
+333
+333
+
+
+Raw data size:
+
+K⋅b​(ℰk)⋅𝐾𝑏subscriptℰ𝑘K\cdot b(\mathcal{E}_{k}) MB
+
+b​(ℰk)≃30similar-to-or-equals𝑏subscriptℰ𝑘30b(\mathcal{E}_{k})\simeq 30 MB
+
+
+Model size:
+
+b​(𝐖)=290𝑏𝐖290b(\mathbf{W})=290 KB
+
+b​(𝐖)=290𝑏𝐖290b(\mathbf{W})=290 KB
+
+
+PUE γ𝛾\gamma:
+1.671.671.67
+111
+
+
+Utilization β𝛽\beta:
+
+0.10.10.1 (model averaging)
+
+
+ML model:
+DeepMind [9], 555 layers, C=6𝐶6C=6. Optimizer: Adam
+
+
+Comm. EEEE\mathrm{EE}:
+Downlink (DL):
+Uplink (UL):
+
+
+
+EED=0.02÷1subscriptEED0.021\mathrm{EE_{D}}=0.02\div 1Mb/J
+
+EEU=0.02÷1subscriptEEU0.021\mathrm{EE_{U}=0.02\div 1}Mb/J
+
+
+
+Mesh or D2D (M):
+
+
+
+EEM=0.01÷1subscriptEEM0.011\mathrm{EE_{M}=0.01\div 1}Mb/J
+
+
+Comp. EEEE\mathrm{EE}:
+
+EEC=0.9subscriptEEC0.9\mathrm{EE_{C}}=0.9 round/J
+
+EECφsubscriptEEC𝜑\mathrm{\tfrac{EE_{C}}{\varphi}} round/J, φ=0.22𝜑0.22\varphi=0.22
+
+
+
+
+
+
+TABLE II:  Communication and computing carbon footprints.
+
+
+
+
+Communication CCsubscript𝐶CC_{\mathrm{C}}
+Computing CLsubscript𝐶LC_{\mathrm{L}}
+Carbon footprint
+
+
+CL (data center):
+∑k=1Kb​(ℰk)⋅CIkEEUsuperscriptsubscript𝑘1𝐾⋅𝑏subscriptℰ𝑘subscriptCI𝑘subscriptEEU\sum_{k=1}^{K}b(\mathcal{E}_{k})\cdot\frac{\mathrm{CI}_{k}}{\mathrm{EE_{U}}}
+n⋅γ⋅CI0EEC⋅𝑛𝛾subscriptCI0subscriptEECn\cdot\gamma\cdot\frac{\mathrm{CI}_{0}}{\mathrm{EE_{C}}}
+CCL=CC+CLsubscript𝐶CLsubscript𝐶Csubscript𝐶LC_{\mathrm{CL}}=C_{\mathrm{C}}+C_{\mathrm{L}}
+
+
+FL (with PS): Ka≤Ksubscript𝐾𝑎𝐾K_{a}\leq K
+
+n⋅b​(𝐖)⋅(∑k=1KaCIkEEU+γ⋅K⋅CI0EED)⋅⋅𝑛𝑏𝐖superscriptsubscript𝑘1subscript𝐾𝑎subscriptCI𝑘subscriptEEU⋅𝛾𝐾subscriptCI0subscriptEEDn\cdot b(\mathbf{W})\cdot\left(\sum_{k=1}^{K_{a}}\frac{\mathrm{CI}_{k}}{\mathrm{EE_{U}}}+\gamma\cdot K\cdot\frac{\mathrm{CI}_{0}}{\mathrm{EE_{D}}}\right)
+n⋅(∑k=1Kaφ⋅CIkEEC+β⋅γ⋅CI0EEC)⋅𝑛superscriptsubscript𝑘1subscript𝐾𝑎⋅𝜑subscriptCI𝑘subscriptEEC⋅𝛽𝛾subscriptCI0subscriptEECn\cdot\left(\sum_{k=1}^{K_{a}}\frac{\varphi\cdot\mathrm{CI}_{k}}{\mathrm{EE_{C}}}+\beta\cdot\gamma\cdot\frac{\mathrm{CI}_{0}}{\mathrm{EE_{C}}}\right)
+CFL=CC+CLsubscript𝐶FLsubscript𝐶Csubscript𝐶LC_{\mathrm{FL}}=C_{\mathrm{C}}+C_{\mathrm{L}}
+
+
+CFL : Ka≤Ksubscript𝐾𝑎𝐾K_{a}\leq K, N≥1𝑁1N\geq 1
+
+
+n⋅b​(𝐖)⋅(∑k=1KaN⋅CIkEEM)⋅⋅𝑛𝑏𝐖superscriptsubscript𝑘1subscript𝐾𝑎⋅𝑁subscriptCI𝑘subscriptEEMn\cdot b(\mathbf{W})\cdot\left(\sum_{k=1}^{K_{a}}\frac{N\cdot\mathrm{CI}_{k}}{\mathrm{EE_{M}}}\right),
+n⋅∑k=1Kaφ⋅CIkEEC⋅𝑛superscriptsubscript𝑘1subscript𝐾𝑎⋅𝜑subscriptCI𝑘subscriptEECn\cdot\sum_{k=1}^{K_{a}}\frac{\varphi\cdot\mathrm{CI}_{k}}{\mathrm{EE_{C}}}
+CCFL=CC+CLsubscript𝐶CFLsubscript𝐶Csubscript𝐶LC_{\mathrm{CFL}}=C_{\mathrm{C}}+C_{\mathrm{L}}
+
+
+
+
+
+
+
+II-B Federated Learning (FL)
+
+
+Unlike CL, FL distributes the learning process across a selected subset 𝒩tsubscript𝒩𝑡\mathcal{N}_{t}
+of Ka<Ksubscript𝐾𝑎𝐾K_{a}<K active devices as shown in Fig. 1. At each round t𝑡t, the local dataset ℰksubscriptℰ𝑘\mathcal{E}_{k} is used
+to train a local model 𝐖k,tsubscript𝐖𝑘𝑡\mathbf{W}_{k,t}, in order to minimize the
+local loss ξksubscript𝜉𝑘\xi_{k} as 𝐖k,t=argmin𝐖ξk(⋅|𝐖)\mathbf{W}_{k,t}=\underset{\mathbf{W}}{\mathrm{arg}\mathrm{min}}\thinspace\xi_{k}(\cdot|\mathbf{W}).
+The local model is then forwarded to the PS [5] over the UL. The
+PS is in charge of updating the global model 𝐖t+1subscript𝐖𝑡1\mathbf{W}_{t+1} for
+the following round t+1𝑡1t+1 through the aggregation of the Kasubscript𝐾𝑎K_{a}
+received models [4]: 𝐖t+1=1Ka​∑k∈𝒩tΓk⋅𝐖k,tsubscript𝐖𝑡11subscript𝐾𝑎subscript𝑘subscript𝒩𝑡⋅subscriptΓ𝑘subscript𝐖𝑘𝑡\mathbf{W}_{t+1}=\tfrac{1}{K_{a}}\sum_{k\in\mathcal{N}_{t}}\Gamma_{k}\cdot\mathbf{W}_{k,t},
+with Γk=QkQsubscriptΓ𝑘subscript𝑄𝑘𝑄\Gamma_{k}=\tfrac{Q_{k}}{Q} and (Qk,Qsubscript𝑄𝑘𝑄Q_{k},Q) being the number
+of local and global examples, respectively. The new model 𝐖t+1subscript𝐖𝑡1\mathbf{W}_{t+1} is finally sent back to the devices over the DL. Other strategies are discussed in [5]. Notice that, while Kasubscript𝐾𝑎K_{a} active devices run the local optimizer and share the local model with the
+PS on the assigned round, the remaining K−Ka𝐾subscript𝐾𝑎K-K_{a} devices have their computing hardware turned off, while the communication interface is powered on to decode the updated global model.
+
+
+For n𝑛n rounds, now consisting of learning and communication tasks,
+the total end-to-end energy includes both devices and PS consumption,
+namely:
+
+
+
+
+
+
+EF​L​(ξ)=subscript𝐸𝐹𝐿𝜉absent\displaystyle E_{FL}(\xi)={}
+γ⋅n⋅β⋅E0(C)+limit-from⋅𝛾𝑛𝛽superscriptsubscript𝐸0C\displaystyle\gamma\cdot n\cdot\beta\cdot E_{0}^{(\mathrm{C})}\,+
+
+(2)
+
+
+
+
++γ⋅∑t=1n∑k=1Kb​(𝐖)⋅E0,k(T)+limit-from⋅𝛾superscriptsubscript𝑡1𝑛superscriptsubscript𝑘1𝐾⋅𝑏𝐖superscriptsubscript𝐸0𝑘T\displaystyle+\gamma\cdot\sum_{t=1}^{n}\sum_{k=1}^{K}b(\mathbf{W})\cdot E_{0,k}^{(\mathrm{T})}\,+
+
+
+
+
+
++∑t=1n∑k∈𝒩t[Ek(C)+b​(𝐖)⋅Ek,0(T)].superscriptsubscript𝑡1𝑛subscript𝑘subscript𝒩𝑡delimited-[]superscriptsubscript𝐸𝑘C⋅𝑏𝐖superscriptsubscript𝐸𝑘0T\displaystyle+\sum_{t=1}^{n}\sum_{k\in\mathcal{N}_{t}}\left[E_{k}^{(\mathrm{C})}+b(\mathbf{W})\cdot E_{k,0}^{(\mathrm{T})}\right]\,.
+
+
+
+
+PS energy is given by β⋅E0(C)⋅𝛽superscriptsubscript𝐸0C\beta\cdot E_{0}^{(\mathrm{C})} and depends on the
+time, β​T0𝛽subscript𝑇0\beta T_{0}, needed for model averaging. This is considerably
+smaller than the batch time T0subscript𝑇0T_{0} at the data center (i.e., β≪1much-less-than𝛽1\beta\ll 1). The energy
+cost per round for device k𝑘k is due to the local optimization over the
+data batches ℰksubscriptℰ𝑘\mathcal{E}_{k}: Ek(C)=Pk⋅B⋅Tksuperscriptsubscript𝐸𝑘C⋅subscript𝑃𝑘𝐵subscript𝑇𝑘E_{k}^{(\mathrm{C})}=P_{k}\cdot B\cdot T_{k}.
+Notice that, while data centers employ high-performance CPUs, GPUs
+or other specialized hardware (e.g., NPUs or TPUs), the devices
+are usually equipped with embedded low-consumption CPUs or microcontrollers. Thus, it
+is reasonable to assume Ek(C)<E0(C)superscriptsubscript𝐸𝑘Csuperscriptsubscript𝐸0CE_{k}^{(\mathrm{C})}<E_{0}^{(\mathrm{C})}.
+Model size b​(𝐖)𝑏𝐖b(\mathbf{W}) quantifies the size in bits of model parameters
+to be exchanged, which is typically much smaller compared with the raw
+data [5]: b​(𝐖)≪b​(ℰk)much-less-than𝑏𝐖𝑏subscriptℰ𝑘b(\mathbf{W})\ll b(\mathcal{E}_{k}). In addition,
+the parameters size is roughly the same for each device, unless lossy/lossless
+compression [12][13] is implemented. Sending
+data regularly in small batches simplifies medium access control
+resource allocation and frame aggregation operations. As shown in
+[3], the PUE for all devices is set to γ=1𝛾1\gamma=1.
+
+
+
+
+II-C Consensus-driven Federated Learning (CFL)
+
+
+In decentralized FL driven by consensus, devices mutually exchange the local model parameters
+using a low-power distributed mesh network as backbone [2, 7, 12].
+As shown in the example of Fig. 1, devices exchange a compressed version [12, 13, 14] of their
+local models 𝐖k,tsubscript𝐖𝑘𝑡\mathbf{W}_{k,t} following an assigned graph connecting
+the learners, and update them by distributed weighted averaging
+[7, 8]. Let 𝒩k,tsubscript𝒩𝑘𝑡\mathcal{N}_{k,t} be the set that contains
+the N𝑁N chosen neighbors of node k𝑘k at round t𝑡t, in every new
+round (t>0𝑡0t>0) the device updates the local model 𝐖k,tsubscript𝐖𝑘𝑡\mathbf{W}_{k,t}
+using the parameters 𝐖h,tsubscript𝐖ℎ𝑡\mathbf{W}_{h,t} obtained from the neighbor
+device(s) as 𝐖k,t+1=𝐖k,t+∑h∈𝒩k,tΓh⋅(𝐖h,t−𝐖k,t\mathbf{W}_{k,t+1}=\mathbf{W}_{k,t}+\sum_{h\in\mathcal{N}_{k,t}}\Gamma_{h}\cdot(\mathbf{W}_{h,t}-\mathbf{W}_{k,t}).
+Weights can be chosen as Γh=Qh​[N⋅∑h∈𝒩k,tQh]−1subscriptΓℎsubscript𝑄ℎsuperscriptdelimited-[]⋅𝑁subscriptℎsubscript𝒩𝑘𝑡subscript𝑄ℎ1\Gamma_{h}=Q_{h}[N\cdot\sum_{h\in\mathcal{N}_{k,t}}Q_{h}]^{-1}.
+Averaging is followed by gradient-based model optimization on ℰksubscriptℰ𝑘\mathcal{E}_{k}.
+
+
+For Ka<Ksubscript𝐾𝑎𝐾K_{a}<K active devices in the set 𝒩tsubscript𝒩𝑡\mathcal{N}_{t} and n𝑛n
+rounds, the energy footprint is captured only by device consumption:
+
+
+
+
+
+
+EC​F​L​(ξ)=subscript𝐸𝐶𝐹𝐿𝜉absent\displaystyle E_{CFL}(\xi)={}
+∑t=1n∑k∈𝒩tEk(C)+limit-fromsuperscriptsubscript𝑡1𝑛subscript𝑘subscript𝒩𝑡superscriptsubscript𝐸𝑘C\displaystyle\sum_{t=1}^{n}\sum_{k\in\mathcal{N}_{t}}E_{k}^{(\mathrm{C})}+
+
+(3)
+
+
+
+
++∑t=1n∑k∈𝒩t∑h∈𝒩k,tb​(𝐖)⋅Ek,h(T).superscriptsubscript𝑡1𝑛subscript𝑘subscript𝒩𝑡subscriptℎsubscript𝒩𝑘𝑡⋅𝑏𝐖superscriptsubscript𝐸𝑘ℎT\displaystyle+\sum_{t=1}^{n}\sum_{k\in\mathcal{N}_{t}}\sum_{h\in\mathcal{N}_{k,t}}b(\mathbf{W})\cdot E_{k,h}^{(\mathrm{T})}\,.
+
+
+
+
+The sum ∑h∈𝒩k,tb​(𝐖)⋅Ek,h(T)subscriptℎsubscript𝒩𝑘𝑡⋅𝑏𝐖superscriptsubscript𝐸𝑘ℎT\sum_{h\in\mathcal{N}_{k,t}}b(\mathbf{W})\cdot E_{k,h}^{(\mathrm{T})} models the total energy spent by the device k𝑘k to diffuse the local
+model parameters to N𝑁N selected neighbors at round t𝑡t.
+
+
+Figure 2:  From left to right. (a) estimated carbon footprints of FL and
+CL for varying number of learning rounds: CL (black) is shown in dashed
+lines for K=60𝐾60K=60 devices, while FL (red with circle markers) and
+CFL (red with cross markers) are shown for K=60𝐾60K=60 devices and Ka=40subscript𝐾𝑎40K_{a}=40
+active ones on each round with N=1𝑁1N=1 neighbors; (b) estimated carbon emissions vs. target loss tradeoff (K=60𝐾60K=60, Ka=40subscript𝐾𝑎40K_{a}=40, N=1𝑁1N=1) and varying CI: max EU (red), Italy (black)
+and Finland (blue); (c) estimated carbon emissions of CL, FL, and CFL for varying
+communication EE ranging from 505050 kbit/J to 400400400 kbit/s, and networked devices: K=30𝐾30K=30 (Ka=20)subscript𝐾𝑎20(K_{a}=20), and K=60𝐾60K=60 (Ka=40subscript𝐾𝑎40K_{a}=40). Optimal EE below which FL is more carbon efficient than CL is highlighted.
+
+
+
+
+
+
+III Carbon footprint assessment 
+
+
+The carbon footprint evaluation assumes that each device k𝑘k, including
+the server, is located in a specific geographical region characterized
+by a known carbon intensity (CIksubscriptCI𝑘\mathrm{CI}_{k}) of electricity generation
+[15]. CI is measured in kg CO2-equivalent emissions per kWh (kgCO2-eq/kWh)
+which quantifies how much carbon emissions are produced
+per kilowatt hour of generated electricity. In the following, we consider
+the CI figures reported in EU back in 2019 [16]. Considering the energy
+models (1)-(3), carbon
+emission is evaluated by multiplying each individual energy contribution,
+namely Ek(C)superscriptsubscript𝐸𝑘CE_{k}^{(\mathrm{C})} and Ek,h(T)superscriptsubscript𝐸𝑘ℎTE_{k,h}^{(\mathrm{T})} by the
+corresponding intensity values CIksubscriptCI𝑘\mathrm{CI}_{k}. Carbon footprints
+and the proposed framework are summarized in Table II
+for CL (CCLsubscript𝐶CLC_{\mathrm{CL}}) and FL policies (CFLsubscript𝐶FLC_{\mathrm{FL}}) and (CCFLsubscript𝐶CFLC_{\mathrm{CFL}}).
+
+
+To analyze the main factors that impact the estimated carbon emissions,
+a few simplifications to the energy models (1)-(3)
+are introduced in the following. Communication
+and computing costs are quantified on average, in terms of the corresponding
+energy efficiencies (EE). Communication EE for DL (EED=[E0,k(T)]−1subscriptEEDsuperscriptdelimited-[]superscriptsubscript𝐸0𝑘T1\mathrm{EE}_{\mathrm{D}}=[E_{0,k}^{(\mathrm{T})}]^{-1}),
+UL (EEU=[Ek,0(T)]−1subscriptEEUsuperscriptdelimited-[]superscriptsubscript𝐸𝑘0T1\mathrm{EE}_{\mathrm{U}}=[E_{k,0}^{(\mathrm{T})}]^{-1}) and
+mesh networking (EEM=[Ek,h(T)]−1subscriptEEMsuperscriptdelimited-[]superscriptsubscript𝐸𝑘ℎT1\mathrm{EE}_{\mathrm{M}}=[E_{k,h}^{(\mathrm{T})}]^{-1})
+are measured in bit/Joule [bit/J] and describe how much
+energy is consumed per correctly received information bit [17].
+Efficiencies depend on device/server consumption for communication
+PTsubscript𝑃TP_{\mathrm{T}} and net UL/DL or mesh throughput R𝑅R. Depending on network
+implementations, we consider different choices of EEDsubscriptEED\mathrm{EE}_{\mathrm{D}}, EEUsubscriptEEU\mathrm{EE}_{\mathrm{U}} and EEMsubscriptEEM\mathrm{EE}_{\mathrm{M}}. The computing efficiency, EEC=[E0(C)]−1subscriptEECsuperscriptdelimited-[]superscriptsubscript𝐸0C1\mathrm{EE}_{\mathrm{C}}=[E_{0}^{(\mathrm{C})}]^{-1}, quantifies the number of rounds per Joule [round/J], namely how much energy per learning round is consumed at the data
+center (or PS). Devices equipped with embedded low-consumption CPUs
+typically experience a larger time span Tk>T0subscript𝑇𝑘subscript𝑇0T_{k}>T_{0} to process
+an individual batch of data; on the other hand, they use much lower
+power (Pksubscript𝑃𝑘P_{k}). Device computing EEEE\mathrm{EE} is typically larger and
+modeled here as EECφsubscriptEEC𝜑\frac{\mathrm{EE_{\mathrm{C}}}}{\varphi} with φ=Ek(C)/E0(C)<1𝜑superscriptsubscript𝐸𝑘Csuperscriptsubscript𝐸0C1\varphi=E_{k}^{(\mathrm{C})}/E_{0}^{(\mathrm{C})}<1. Typical values for communication and computing EEEE\mathrm{EE} are in Table I.
+
+
+In the proposed FL implementation, the set of Kasubscript𝐾𝑎K_{a} active FL devices
+changes according to a round robin scheduling, other options are proposed in [19]. Considering typical
+CFL implementations, such as gossip [6], we let the
+devices choose up to N=1𝑁1N=1 neighbors per round. When ad-hoc mesh,
+or D2D, communication interfaces are not available, the energy cost to implement the generic peer-to-peer link (k,h𝑘ℎk,h) roughly corresponds to an UL transmission from the source k𝑘k to
+the core network access point (i.e., router), followed by a DL communication from the router(s) to the destination device hℎh, namely Ek,h(T)≃Ek,0(T)+E0,h(T)similar-to-or-equalssuperscriptsubscript𝐸𝑘ℎTsuperscriptsubscript𝐸𝑘0Tsuperscriptsubscript𝐸0ℎTE_{k,h}^{(\mathrm{T})}\simeq E_{k,0}^{(\mathrm{T})}+E_{0,h}^{(\mathrm{T})},
+or equivalently [EEM]−1≃[EED]−1+[EEU]−1similar-to-or-equalssuperscriptdelimited-[]subscriptEEM1superscriptdelimited-[]subscriptEED1superscriptdelimited-[]subscriptEEU1[\mathrm{EE}_{\mathrm{M}}]^{-1}\simeq[\mathrm{EE}_{\mathrm{D}}]^{-1}+[\mathrm{EE}_{\mathrm{U}}]^{-1}.
+Router can be a host or base-station. In mesh networks, further optimization
+via power control [18] may be also possible depending on
+the node deployment. Since devices do not need the router to relay
+information to the PS, which may be located in a different country,
+substantial energy savings are expected.
+
+
+TABLE III:  Number of rounds (min-max), communication/computing energy costs and
+corresponding carbon footprints for selected cases, varying losses ξ¯¯𝜉\overline{\xi}, and IID
+vs. non-IID data distributions. EEU=EED=100subscriptEEUsubscriptEED100\mathrm{EE}_{\mathrm{U}}=\mathrm{EE}_{\mathrm{D}}=100 kbit/J
+
+
+
+
+
+IV Industry 4.0 robotized environment
+
+
+According to [20], in 2019 industry was responsible for
+about 303030% of the world greenhouse gas emissions. To counter this
+impact, Industry 4.0 (I4.0) and other mitigation policies
+have been recently introduced [21].
+In line with the I4.0 paradigm,
+we resort to a common Industrial Internet of Things (IIoT) scenario
+where AI-based sensors and machines are interconnected and co-located in the
+same plant [22]. These sensors interact within an industrial workspace
+where human workers are co-present. Devices are served by a WiFi (IEEE 802.11ac)
+network and a router (PT=6subscript𝑃T6P_{\mathrm{T}}=6 W [23]) is in charge
+of orchestrating the mesh communication or forwarding to
+the data center, or PS.
+
+
+
+IV-A Case study: scenario-dependent setup
+
+
+The goal of the training task is to learn a ML model for the detection
+(classification) of the position of the human operators sharing the
+workspace, namely the human-robot distance d𝑑d and the direction
+of arrival (DOA) θ𝜃\theta. Further details about the the robotic
+manipulators, the industrial environment and the deployed sensors
+are given in [2], [18]. Input data 𝐱hsubscript𝐱ℎ\mathbf{x}_{h},
+available online [24], are range-azimuth maps obtained
+from 333 time-division multiple-input-multiple output (TD-MIMO) frequency
+modulated continuous wave (FMCW) radars working in the 777777 GHz band
+[22]. During the on-line workflow, position (d𝑑d, θ𝜃\theta)
+information are obtained from the trained ML model and sent to a programmable
+logic controller for robot safety control (e.g., emergency stop
+or replanning tasks). The ML model adopted for the classification of the
+operator location is a simplified version of the DeepMind [9].
+It consists of 555 trainable layers and 333M parameters, of which 170170170k are
+compressed, encoded by 161616 bits and exchanged during FL. Model outputs are
+reduced to C=6𝐶6C=6 for the detection of 666 subject locations around the robot,
+detailed in [24]. Batch times and size of exchanged model parameters b​(𝐖)𝑏𝐖b(\mathbf{W}) (kB) are reported in Table I. Adam optimizer is used with a Huber loss [5]. The number of devices (K𝐾K) is in the range 30≤K≤6030𝐾6030\leq K\leq 60,
+data can be identically distributed (IID) or non-IID.
+Moreover, 20≤Ka≤4020subscript𝐾𝑎4020\leq K_{a}\leq 40 and N=1𝑁1N=1 are assumed.
+
+
+Energy and carbon footprints are influenced by data center and device
+hardware configurations. The data center hardware consumption is reported
+in Table I and uses CPU (Intel i7 8700K, 3.73.73.7 GHz, 646464 GB)
+and GPU (Nvidia Geforce GTX 1060, 1.51.51.5 GHz, 333 GB). For FL devices,
+we use Raspberry Pi 4 boards based
+on a low-power CPU (ARM-Cortex-A72 SoC type BCM2711, 1.51.51.5 GHz, 888 GB). These
+devices can be viewed as a realistic pool of FL learners
+embedded in various IIoT applications. FL is implemented using
+Tensorflow v2.32.32.3 backend (sample code available also in [24]).
+In what follows, rather than choosing a specific communication protocol,
+we follow a what-if analysis approach, and thus we quantify the estimated
+carbon emissions under the assumption of different DL/UL communication
+efficiencies (EEEE\mathrm{EE}). Since actual emissions may be larger than
+the estimated ones depending on the specific protocol overhead and
+implementation, we will highlight relative comparisons.
+
+
+
+
+IV-B Case study: carbon footprint analysis
+
+
+Fig. 2 provides an estimate of the carbon footprint under
+varying settings as detailed in Table I. Fig. 2(a)
+shows the carbon footprint for varying number of learning rounds (n𝑛n),
+comparing CL with K=60𝐾60K=60 devices and FL with Ka=40subscript𝐾𝑎40K_{a}=40. For CL (dashed line),
+an initial energy cost shall be paid for UL raw data transmission, which depends
+on the data size b​(ℰk)𝑏subscriptℰ𝑘b(\mathcal{E}_{k}) and the communication EE; in this example,
+EEU=EED=200subscriptEEUsubscriptEED200\mathrm{EE}_{\mathrm{U}}=\mathrm{EE}_{\mathrm{D}}=200
+kbit/J. Next, the energy cost is only due to computing (404040 J/round),
+unless new labelled data are produced by devices before the learning process
+ends on the data center. In contrast to CL, FL footprint depends on communication
+and computing energy costs per round. CFL (cross markers) has a cost
+of 224224224 J/round, smaller than FL, namely 287287287 J/round (circle
+markers) as PS is not required. Notice that mesh communication is replaced by UL
+and DL WiFi transmissions to/from a router.
+
+
+Energy and accuracy loss ξ𝜉\xi can be traded off to optimize efficiency.
+For example, CL needs n=25𝑛25n=25 rounds at the data center to achieve a
+loss of ξ=0.08𝜉0.08\xi=0.08 and a carbon footprint of 2.92.92.9 gCO2-eq. Model
+training should be typically repeated every 333 hours to track modifications
+of the robotic cell layout, which corresponds to a total carbon emission
+of 8.48.48.4 equivalent kgCO2-eq per year. CFL trains for more rounds
+(here n=27𝑛27n=27) to achieve a slightly larger loss (ξ=0.2𝜉0.2\xi=0.2), but
+reduces the emissions down to 1.71.71.7 gCO2-eq, or 4.94.94.9 kgCO2-eq per year,
+if training is repeated every 333 hours. Finally, FL achieves
+a similar footprint, however this comes in exchange for a larger validation
+loss (ξ=0.3𝜉0.3\xi=0.3) due to communication with the PS. Although not considered here, tuning of model as well as changing the aggregation strategy
+at the PS [5] would reduce the training time and thus emissions.
+
+
+The end-to-end energy cost is investigated in Figs. 2(b) and 2(c).
+Energy vs. loss trade-off is first analyzed in Fig. 2(b). We
+consider 333 setups where the data center and the devices are placed
+in different geographical areas featuring different carbon indexes
+(CIs). In particular, the first scenario (max EU, red) is characterized
+by devices located in a region that produces considerable emissions as CIk=0.97subscriptCI𝑘0.97\mathrm{CI}_{k}=0.97 kgCO2-eq/kWh. This corresponds
+to the max emission rate in EU [16]. In the second (IT, black)
+and third (FI, blue) scenarios, devices and data center are located
+in Italy, CIk=0.28subscriptCI𝑘0.28\mathrm{CI}_{k}=0.28 kgCO2-eq/kWh, and Finland, CIk=0.11subscriptCI𝑘0.11\mathrm{CI}_{k}=0.11
+kgCO2-eq/kWh, respectively. When the availability
+of green energy is small (i.e., max EU scenario, CIk=0.97subscriptCI𝑘0.97\mathrm{CI}_{k}=0.97),
+the learning loss and accuracy must be traded with carbon emissions.
+For example, for an amount of gas emission equal, or lower, than CL, the
+learning loss of CFL should be increased to ξ¯=0.1¯𝜉0.1\overline{\xi}=0.1,
+corresponding to an average accuracy of 90%percent9090\%. Considering FL, this
+should be increased to ξ¯=0.25¯𝜉0.25\overline{\xi}=0.25. For smaller carbon
+indexes, i.e. IT and FI scenarios, the cost per round reduces.
+Therefore, FL can train for all the required rounds and experience
+the same loss as in CL with considerable emission savings (30%÷40%percent30percent4030\%\div 40\%
+for Finland). A promising roadmap for FL optimization is to let local learners
+contribute to the training process if, or when, green energy, namely small
+CIksubscriptCI𝑘\mathrm{CI}_{k}, is made available.
+
+
+In Fig. 2(c) we now quantify the carbon emissions of CL,
+FL and CFL for varying communication EE, ranging from EEU=EED=50subscriptEEUsubscriptEED50\mathrm{EE}_{\mathrm{U}}=\mathrm{EE}_{\mathrm{D}}=50
+kbit/J to 400400400 kbit/J, and number of devices, K=30𝐾30K=30 (Ka=20)subscript𝐾𝑎20(K_{a}=20), and K=60𝐾60K=60 (Ka=40subscript𝐾𝑎40K_{a}=40). An increase of the network size or a decrease of the network kb/J efficiency cause communication to emit much more CO2 than training. Since FL is more communication efficient as (compressed) model parameters are exchanged, in line with [3], the best operational condition of FL is under limited communication EEEE\mathrm{EE} regimes. For the considered scenario, the optimal EE below which FL leaves a smaller carbon footprint than CL is in the range 50%÷100percent5010050\%\div 100 kbit/J for FL (ξ¯=0.2¯𝜉0.2\overline{\xi}=0.2) and 250%÷300percent250300250\%\div 300 kbit/J for CFL (ξ¯=0.1¯𝜉0.1\overline{\xi}=0.1). Finally, notice that for all cases FL can efficiently operate under EE=50EE50\mathrm{EE}=50 kbit/J, typically observed in low power communications [25], and 4G/5G NB-IoT [26].
+
+
+Table III compares the energy and carbon footprints for IID
+and non-IID data distributions. Computing, communication energy costs and
+corresponding carbon emissions for different target losses are evaluated
+with respect to the max EU scenario. Considering FL and CFL, federated computations are now distributed across Kasubscript𝐾𝑎K_{a} devices, therefore larger computing costs are needed. Non-IID data generally penalizes both FL and CFL as energy consumption
+increases up to 40%percent4040\% in some cases. For example, while CFL with IID data limits
+the number of required epochs (targeting ξ¯=0.1¯𝜉0.1\overline{\xi}=0.1) to a maximum of n=43𝑛43n=43,
+it is less effective for non-IID distributions as the required rounds now increase
+up to n=62𝑛62n=62 for some devices. CFL and FL thus experience an increase in energy
+costs, but CFL still emits lower carbon emissions. More advanced gradient-based
+CFL methods [7] might be considered when data distributions across devices
+are extremely unbalanced.
+
+
+
+
+
+
+V Conclusions
+
+
+This work developed a framework for the analysis of energy and carbon footprints in distributed and federated learning (FL).
+It provides, for the first time, a trade-off analysis between vanilla
+and consensus FL on local datasets, and centralized learning inside the data
+center. A simulation framework has been developed for the performance analysis
+over arbitrarily complex wireless network structures. Carbon equivalent
+emissions are quantified and discussed for a continual industrial workflow
+monitoring application that tracks the movements of workers inside human-robot
+shared workspaces. The ML model is periodically (re)trained to track changes
+in data distributions. In many cases, energy and accuracy should
+be traded to optimize FL energy efficiency. Furthermore, by eliminating
+the parameter server, as made possible by emerging decentralized FL
+architectures, further reducing the energy footprint is a viable solution.
+Novel opportunities for energy-aware optimizations are also highlighted.
+These will target the migration of on-device computations where the
+availability of green energy is larger. Finally, FL requires a frequent
+and intensive use of the communication interfaces. This mandates a co-design
+of the federation policy and the communication architecture, rooted in
+the novel 6G paradigms.

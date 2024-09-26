@@ -1,0 +1,199 @@
+Abstract:
+
+Abstract
+Deep learning (DL) can achieve impressive results across a wide variety of tasks, but this often comes at the cost of training models for extensive periods on specialized hardware accelerators. This energy-intensive workload has seen immense growth in recent years. Machine learning (ML) may become a significant contributor to climate change if this exponential trend continues. If practitioners are aware of their energy and carbon footprint, then they may actively take steps to reduce it whenever possible. In this work, we present carbontracker, a tool for tracking and predicting the energy and carbon footprint of training DL models. We propose that energy and carbon footprint of model development and training is reported alongside performance metrics using tools like carbontracker. We hope this will promote responsible computing in ML and encourage research into energy-efficient deep neural networks. 111Source code for carbontracker is available here: https://github.com/lfwa/carbontracker
+
+
+
+
+1 Introduction
+
+The popularity of solving problems using deep learning (DL) has rapidly increased and with it the need for ever more powerful models. These models achieve impressive results across a wide variety of tasks such as gameplay, where AlphaStar reached the highest rank in the strategy game Starcraft II (Vinyals et al., 2019) and Agent57 surpassed human performance in all 57 Atari 2600 games (Badia et al., 2020). This comes at the cost of training the model for thousands of hours on specialized hardware accelerators such as graphics processing units (GPUs). From 2012 to 2018 the compute needed for DL grew 300 000 times300000absent300\,000\text{\,}-fold (Amodei & Hernandez, 2018).
+
+
+This immense growth in required compute has a high energy demand, which in turn increases the demand for energy production. In 2010 energy production was responsible for approximately 353535% of total anthropogenic greenhouse gas (GHG) emissions (Bruckner et al., 2014). Should this exponential trend in DL compute continue then machine learning (ML) may become a significant contributor to climate change.
+
+
+This can be mitigated by exploring how to improve energy efficiency in DL. Moreover, if practitioners are aware of their energy and carbon footprint, then they may actively take steps to reduce it whenever possible. We show that in ML, these can be simple steps that result in considerable reductions to carbon emissions.
+
+
+The environmental impact of ML in research and industry has seen increasing interest in the last year following the 2018 IPCC special report (IPCC, 2018) calling for urgent action in order to limit global warming to 1.5 °Ctimes1.5celsius1.5\text{\,}\mathrm{\SIUnitSymbolCelsius}. We briefly review some notable work on the topic.
+Strubell et al. (2019) estimated the financial and environmental costs of R&D and hyperparameter tuning for various state-of-the-art (SOTA) neural network (NN) models in natural language processing (NLP). They point out that increasing cost and emissions of SOTA models contribute to a lack of equity between those researchers who have access to large-scale compute, and those who do not. The authors recommend that metrics such as training time, computational resources required, and model sensitivity to hyperparameters should be reported to enable direct comparison between models.
+Lacoste et al. (2019) provided the Machine Learning Emissions Calculator
+that relies on self-reporting. The tool can estimate the carbon footprint of GPU compute by specifying hardware type, hours used, cloud provider, and region. Henderson et al. (2020) presented the experiment-impact-tracker
+framework and gave various strategies for mitigating carbon emissions in ML. Their Python framework allows for estimating the energy and carbon impact of ML systems as well as the generation of “Carbon Impact Statements” for standardized reporting hereof.
+
+
+In this work, we propose carbontracker, a tool for tracking and predicting the energy consumption and carbon emissions of training DL models. The methodology is similar to that of Henderson et al. (2020) but differs from prior art in two major ways:
+
+
+(1)
+
+We allow for a further proactive and intervention-driven approach to reducing carbon emissions by supporting predictions. Model training can be stopped, at the user’s discretion, if the predicted environmental cost is exceeded.
+
+
+
+(2)
+
+We support a variety of different environments and platforms such as clusters, desktop computers, and Google Colab notebooks, allowing for a plug-and-play experience.
+
+
+
+
+
+We experimentally evaluate the tool on several different deep convolutional neural network (CNN) architectures and datasets for medical image segmentation and assess the accuracy of its predictions. We present concrete recommendations on how to reduce carbon emissions considerably when training DL models.
+
+
+
+
+
+2 Design and Implementation
+
+The design philosophy that guided the development of carbontracker can be summarized by the following principles:
+
+
+
+Pythonic
+
+
+The majority of ML takes place in the Python language (Wilcox et al., 2017). We want the tool to be as easy as possible to integrate into existing work environments making Python the language of choice.
+
+
+Usable
+
+
+The required effort and added code must be minimal and not obfuscate the existing code structure.
+
+
+Extensible
+
+
+Adding and maintaining support for changing application programming interfaces (APIs) and new hardware should be straightforward.
+
+
+Flexible
+
+
+The user should have full control over what is monitored and how this monitoring is performed.
+
+
+Performance
+
+
+The performance impact of using the tool must be negligible, and computation should be minimal. It must not affect training.
+
+
+Interpretable
+
+
+Carbon footprint expressed in CO2​eqgco\mathrm{CO_{2}eq} is often meaningless. A common understanding of the impact should be facilitated through conversions.
+
+
+
+
+
+Carbontracker is an open-source tool written in Python for tracking and predicting the energy consumption and carbon emissions of training DL models. It is available through the Python Package Index (PyPi).
+The tool is implemented as a multithreaded program.
+It utilizes separate threads to collect power measurements and fetch carbon intensity in real-time for parallel efficiency and to not disrupt the model training in the main thread. Appendix A has further implementation details.
+
+
+Carbontracker supports predicting the total duration, energy, and carbon footprint of training a DL model. These predictions are based on a user-specified number of monitored epochs with a default of 1.
+We forecast the carbon intensity of electricity production during the predicted duration using the supported APIs. The forecasted carbon intensity is then used to predict the carbon footprint. Following our preliminary research, we use a simple linear model for predictions.
+
+
+
+
+
+3 Experiments and Results
+
+In order to evaluate the performance and behavior of carbontracker, we conducted experiments on three medical image datasets using two different CNN models: U-net (Ronneberger et al., 2015) and lungVAE (Selvan et al., 2020). The models were trained for the task of medical image segmentation using three datasets: DRIVE (Staal et al., 2004), LIDC (Armato III et al., 2004), and CXR (Jaeger et al., 2014). Details on the models and datasets are given in Appendix B. All measurements were taken using carbontracker version 1.1.2. We performed our experiments on a single NVIDIA TITAN RTX GPU with 121212 GB memory and two Intel central processing units (CPUs).
+
+
+In line with our message of reporting energy and carbon footprint, we used carbontracker to generate the following statement:
+The training of models in this work is estimated to use 37.445 kW htimes37.445timeskilowatthour37.445\text{\,}\mathrm{kW}\text{\,}\mathrm{h} of electricity contributing to 3.166 kgtimes3.166kilogram3.166\text{\,}\mathrm{kg} of CO2​eqco\mathrm{CO_{2}eq}. This is equivalent to 26.296 kmtimes26.296kilometer26.296\text{\,}\mathrm{km} travelled by car (see A.5).
+
+
+An overview of predictions from carbontracker based on monitoring for 111 training epoch for the trained models compared to the measured values is shown in Figure 1. The errors in the energy predictions are 4.94.94.9–19.119.119.1% compared to the measured energy values, 7.37.37.3–19.919.919.9% for the CO2​eqco\mathrm{CO_{2}eq}, and 0.80.80.8–4.64.64.6% for the duration. The error in the CO2​eqco\mathrm{CO_{2}eq} predictions are also affected by the quality of the forecasted carbon intensity from the APIs used by carbontracker. This is highlighted in Figure 2, which shows the estimated carbon emissions (CO2​eqgco\mathrm{CO_{2}eq}) of training our U-net model on LIDC in Denmark and Great Britain for different carbon intensity estimation methods. As also shown by Henderson et al. (2020), we see that using country or region-wide average estimates may severely overestimate (or under different circumstances underestimate) emissions. This illustrates the importance of using real-time (or forecasted) carbon intensity for accurate estimates of carbon footprint.
+
+
+Figure 1: Comparison of predicted and measured values of energy in  kW htimesabsenttimeskilowatthour\text{\,}\mathrm{kW}\text{\,}\mathrm{h} (left), emissions in  CO2​eqtimesabsentgco\text{\,}\mathrm{CO_{2}eq} (center), and duration in  stimesabsentsecond\text{\,}\mathrm{s} (right) for the full training session when predicting after a single epoch. The diagonal line represents predictions that are equal to the actual measured consumption.
+Description of the models and datasets are in Appendix B.
+
+
+Figure 2: Carbon emissions ( CO2​eqtimesabsentgco\text{\,}\mathrm{CO_{2}eq}) of training the U-net on LIDC dataset for different carbon intensity estimation methods. (left) The emissions of training in Denmark and (right) in Great Britain at 2020-05-21 22:00 local time. Real-time indicates that the current intensity is fetched every 15 mintimes15minute15\text{\,}\mathrm{min} during training using the APIs supported by carbontracker. The average intensities are from 2016 (see Figure 10 in Appendix).
+
+
+Figure 3 summarizes the relative energy consumption of each component across all runs. We see that while the GPU uses the majority of the total energy, around 505050–606060%, the CPU and dynamic random-access memory (DRAM) also account for a significant part of the total consumption. This is consistent with the findings of Gorkovenko & Dholakia (2020), who found that GPUs are responsible for around 707070% of power consumption, CPU for 151515%, and RAM for 101010% when testing on the TensorFlow benchmarking suite for DL on Lenovo ThinkSystem SR670 servers. As such, only accounting for GPU consumption when quantifying the energy and carbon footprint of DL models will lead to considerable underestimation of the actual footprint.
+
+
+Figure 3: Comparison of energy usage by component shown as the relative energy usage (%) out of the total energy spent during training. We see that the GPU uses the majority of the energy, about 505050–606060%, but the CPU and DRAM also account for a significant amount of the total energy consumption across all models and datasets.
+
+
+
+
+
+4 Reducing Your Carbon Footprint
+
+The carbon emissions that occur when training DL models are not irreducible and do not have to simply be the cost of progress within DL. Several steps can be taken in order to reduce this footprint considerably. In this section, we outline some strategies for practitioners to directly mitigate their carbon footprint when training DL models.
+
+
+Figure 4: Estimated carbon emissions ( CO2​eqtimesabsentgco\text{\,}\mathrm{CO_{2}eq}) of training our models (see Appendix B) in different EU-28 countries. The calculations are based on the average carbon intensities from 2016 (see Figure 10 in Appendix).
+
+
+
+Low Carbon Intensity Regions
+
+
+The carbon intensity of electricity production varies by region and is dependent on the energy sources that power the local electrical grid. Figure 4 illustrates how the variation in carbon intensity between regions can influence the carbon footprint of training DL models. Based on the 2016 average intensities, we see that a model trained in Estonia may emit more than 61 times the CO2​eqco\mathrm{CO_{2}eq} as an equivalent model would when trained in Sweden. In perspective, our U-net model trained on the LIDC dataset would emit 17.7 CO2​eqtimes17.7gco17.7\text{\,}\mathrm{CO_{2}eq} or equivalently the same as traveling 0.14 kmtimes0.14kilometer0.14\text{\,}\mathrm{km} by car when trained in Sweden. However, training in Estonia it would emit 1087.9 CO2​eqtimes1087.9gco1087.9\text{\,}\mathrm{CO_{2}eq} or the same as traveling 9.04 kmtimes9.04kilometer9.04\text{\,}\mathrm{km} by car for just a single training session.
+
+
+As training DL models is generally not latency bound, we recommend that ML practitioners move training to regions with a low carbon intensity whenever it is possible to do so. We must further emphasize that for large-scale models that are trained on multiple GPUs for long periods, such as OpenAI’s GPT-3 language model (Brown et al., 2020), it is imperative that training takes place in low carbon intensity regions in order to avoid several megagrams of carbon emissions. The absolute difference in emissions may even be significant between two green regions, like Sweden and France, for such large-scale runs.
+
+
+Training Times
+
+
+Figure 5: Real-time carbon intensity ( CO2​eq​\per​\kilotimesabsentcarbon\text{\,}\mathrm{CO_{2}eq\per\kilo}) for Denmark (DK) and Great Britain (GB) from 2020-05-18 to 2020-05-25 shown in local time. The data is collected using the APIs supported by carbontracker. The carbon intensities are volatile to changes in energy demand and depend on the energy sources available.
+
+
+The time period in which a DL model is trained affects its overall carbon footprint. This is caused by carbon intensity changing throughout the day as energy demand and capacity of energy sources change. Figure 5 shows the carbon intensity (CO2​eq​\per​\kilocarbon\mathrm{CO_{2}eq\per\kilo}) for Denmark and Great Britain in the week of 2020-05-18 to 2020-05-25 collected with the APIs supported by carbontracker. A model trained during low carbon intensity hours of the day in Denmark may emit as little as 1414\frac{1}{4} the CO2​eqco\mathrm{CO_{2}eq} of one trained during peak hours. A similar trend can be seen for Great Britain, where 222-fold savings in emissions can be had.
+
+
+We suggest that ML practitioners shift training to take place in low carbon intensity time periods whenever possible. The time period should be determined on a regional level.
+
+
+Efficient Algorithms
+
+
+The use of efficient algorithms when training DL models can further help reduce compute-resources and thereby also carbon emissions. Hyperparameter tuning may be improved by substituting grid search for random search (Bergstra & Bengio, 2012), using Bayesian optimization (Snoek et al., 2012) or other optimization techniques like Hyperband (Li et al., 2017). Energy efficiency of inference in deep neural networks (DNNs) is also an active area of research with methods such as quantization aware training, energy-aware pruning (Yang et al., 2017), and power- and memory-constrained hyperparameter optimization like HyperPower (Stamoulis et al., 2018).
+
+
+Efficient Hardware and Settings
+
+
+Choosing more energy-efficient computing hardware and settings may also contribute to reducing carbon emissions. Some GPUs have substantially higher efficiency in terms of floating point operations per second (FLOPS) per watt of power usage compared to others (Lacoste et al., 2019).
+Power management techniques like dynamic voltage and frequency scaling (DVFS) can further help conserve energy consumption (Li et al., 2016) and for some models even reduce time to reach convergence (Tang et al., 2019). Tang et al. (2019) show that DVFS can be applied to GPUs to help conserve about 8.78.78.7% to 23.123.123.1% energy consumption for training different DNNs and about 19.619.619.6% to 26.426.426.4% for inference. Moreover, the authors show that the default frequency settings on tested GPUs, such as NVIDIA’s Pascal P100 and Volta V100, are often not optimized for energy efficiency in DNN training and inference.
+
+
+
+
+
+
+
+
+5 Discussion and Conclusion
+
+The current trend in DL is a rapidly increasing demand for compute that does not appear to slow down. This is evident in recent models such as the GPT-3 language model (Brown et al., 2020) with 175175175 billion parameters requiring an estimated 28 000 GPU​-​daystimes28000gpud28\,000\text{\,}\mathrm{GPU\text{-}days} to train excluding R&D (see Appendix D). We hope to spread awareness about the environmental impact of this increasing compute through accurate reporting with the use of tools such as carbontracker. Once informed, concrete and often simple steps can be taken in order to reduce the impact.
+
+
+SOTA-results in DL are frequently determined by a model’s performance through metrics such as accuracy, AUC score, or similar performance metrics. Energy-efficiency is usually not one of these. While such performance metrics remain a crucial measure of model success, we hope to promote an increasing focus on energy-efficiency.
+We must emphasize that we do not argue that compute-intensive research is not essential for the progress of DL. We believe, however, that the impact of this compute should be minimized.
+We propose that the total energy and carbon footprint of model development and training is reported alongside accuracy and similar metrics to promote responsible computing in ML and research into energy-efficient DNNs.
+
+
+In this work, we showed that ML risks becoming a significant contributor to climate change. To this end, we introduced the open-source carbontracker tool for tracking and predicting the total energy consumption and carbon emissions of training DL models. This enables practitioners to be aware of their footprint and take action to reduce it.
+
+
+Acknowledgements
+
+The authors would like to thank Morten Pol Engell-Nørregård for the thorough feedback on the thesis version of this work. The authors also thank the anonymous reviewers and early users of carbontracker for their insightful feedback.

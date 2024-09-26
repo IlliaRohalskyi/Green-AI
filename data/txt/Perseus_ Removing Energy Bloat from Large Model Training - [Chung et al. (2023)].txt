@@ -1,0 +1,1848 @@
+Abstract:
+
+Abstract
+Training large AI models on numerous GPUs consumes a massive amount of energy.
+We observe that not all energy consumed during training directly contributes to end-to-end training throughput, and a significant portion can be removed without slowing down training, which we call energy bloat.
+In this work, we identify two independent sources of energy bloat in large model training, intrinsic and extrinsic, and propose Perseus, a unified optimization framework that mitigates both.
+Perseus obtains the “iteration time–energy” Pareto frontier of any large model training job using an efficient iterative graph cut-based algorithm and schedules energy consumption of its forward and backward computations across time to remove intrinsic and extrinsic energy bloat.
+Evaluation on large models like GPT-3 and Bloom shows that Perseus reduces energy consumption of large model training by up to 30%, enabling savings otherwise unobtainable before.
+
+
+
+
+1 Introduction
+
+As deep neural networks (DNNs) continue to grow in model and dataset size [29, 25], the energy consumption of large model training is increasing as well.
+For instance, training GPT-3 [11] reportedly consumed 1,287 megawatt-hour (MWh) in 2021 [48].
+The recent surge in the development of generative AI (GenAI) and large language models (LLMs) shows no signs of deceleration in AI energy demands.
+
+
+Optimizing the energy consumption of large model training is, therefore, crucial to minimizing the operational costs associated with AI, with additional benefits.
+For example, low-carbon electricity, which is preferred especially in the context of sustainability commitments [1, 4, 6, 7], is still very much a scarce and contended resource [50].
+Reducing energy consumption allows more workloads to fit within the limited supply of low-carbon electricity [10].
+Furthermore, reducing energy consumption without slowdown reduces power draw, either allowing more aggressive datacenter power oversubscription or conversely reducing power throttling for existing workloads [35, 54, 46].
+
+
+Despite many recent works on increasing the throughput of large model training [26, 41, 19, 43, 73, 34, 27], reining in the growing energy consumption remains an open challenge [55, 48].
+In this paper, we aim to identify and remove energy bloat – the portion of energy consumption that can be removed without throughput loss – in large model training.
+We identify two independent sources of energy bloat: intrinsic and extrinsic, and propose a single optimization framework that minimizes both.
+
+
+Intrinsic energy bloat comes from computation imbalance when a large model is distributed across multiple GPUs with pipeline parallelism (§2.2).
+Balancing the amount of computation in each pipeline stage is an important problem for distributed execution planning [41, 19, 23, 73], but perfectly balancing every stage is not always possible because layers in a DNN are coarse-grained tensor operations with varying amounts of computation.
+When all stages do not have the same computation intensity, those not on the critical path of computation run needlessly fast – i.e., they consume energy that does not contribute to the overall training throughput.
+Such intrinsic energy bloat opens up the opportunity to precisely slow down each non-critical computation in the pipeline such that the length of the critical path does not change.
+
+
+Extrinsic energy bloat, in contrast, arises when multiple pipelines run in parallel in a synchronous fashion to scale out training to massive datasets, and one or more pipelines run slower than the others (§2.3).
+Root causes behind such slowdowns are varied, including power/thermal throttling [75, 47, 35, 54, 46], I/O bottlenecks in the storage/network [39, 71], hardware/software failures [61, 27], etc., and the likelihood of their presence increases with the scale and duration of training [22, 28, 64].
+All pipelines running faster than the straggler pipeline are needlessly fast and wasting energy that does not affect the overall training throughput.
+Extrinsic energy bloat allows us to slow down entire pipelines (while still keeping their intrinsic energy bloat low) without delaying gradient synchronization.
+
+
+In this work, we propose Perseus that relies on a unified optimization framework to remove both intrinsic and extrinsic energy bloat during large model training (§3).
+At its core, Perseus efficiently pre-characterizes the entire “iteration time–energy” Pareto frontier, which enables it to minimize intrinsic energy bloat under normal operating conditions and to mitigate extrinsic energy bloat arising from straggler pipelines.
+Existing works fall short on both fronts.
+EnvPipe [13] is limited only to intrinsic bloat reduction with a point solution that leads to suboptimal energy reduction.
+Zeus [68], in contrast, ignores intrinsic bloat altogether as it only considers single-GPU training, which also leads it to identify suboptimal “iteration time–energy” frontiers at best.
+
+
+We prove that optimally solving our optimization problem is in fact NP-hard and propose an efficient algorithm that provides an exact solution for a relaxed problem (§4).
+At its core, our solution represents an iteration of large model training as a directed acyclic graph (DAG).
+Each node in the DAG represents either a forward or backward computation in a particular stage, and nodes are connected with edges that represent computation dependencies.
+Importantly, each node is annotated with its planned execution time and energy consumption, which we call the energy schedule.
+Perseus’s optimization algorithm starts from the energy schedule that consumes the least possible amount of energy, and iteratively speeds up the execution time of the schedule while incurring the least possible energy increase, until no more speed up is possible.
+This generates all energy schedules on the “iteration time–energy” Pareto frontier.
+Minimizing intrinsic and/or extrinsic energy bloat is then as simple as choosing the appropriate energy schedule from the Pareto frontier.
+
+
+While solving the optimization problem depends on accurate fine-grained computation energy profiling, modern GPUs provide energy consumption information only in coarse-grained time intervals.
+Perseus introduces an online profiling technique that can accurately profile the energy consumption of fine-grained computations with low overhead (§5).
+
+
+Evaluation on a variety of large models including GPT-3 [11], BERT [15], T5 [51], Bloom [66] and a scaled-up version of Wide-ResNet [69] shows that Perseus is able to reduce per-iteration energy consumption by up to 30% with negligible or no slowdown (§6).
+
+
+Overall, we make the following contributions in this paper:
+
+
+•
+
+We identify intrinsic and extrinsic energy bloat in large model training, fundamentally caused by computation time imbalance at different levels.
+
+
+
+•
+
+We propose Perseus, an open-source unified optimization framework that aims to remove both types of energy bloat using an efficient graph cut-based algorithm.
+
+
+
+•
+
+We evaluate Perseus on a diverse set of large model workloads and show that it significantly reduces energy bloat.
+
+
+
+
+
+
+
+
+2 Motivation
+
+First, we provide necessary background regarding large model training (§2.1).
+Then, we introduce intrinsic (§2.2) and extrinsic (§2.3) energy bloat present in large model training.
+
+
+
+2.1 Large Model Training
+
+The rapid increase in DNN model size in recent years made data, tensor, and pipeline parallelism [26, 41, 43, 19, 73, 34] essential ingredients for large model training.
+Especially, pipeline parallelism partitions a large model into multiple stages and assigns each stage to different GPUs.
+The training batch is split into multiple microbatches, and their forward and backward computations are pipelined through those stages.
+Then, in order to scale out to more GPUs, such pipelines are replicated multiple times to perform data parallel training, where each pipeline computes a subset of the training batch and synchronizes gradients with one other at the end of each iteration.
+Due to the synchronization barrier in the end, the next iteration can only begin when all pipelines have finished.
+
+
+
+
+2.2 Intrinsic Energy Bloat
+
+
+
+
+(a) 
+
+
+
+
+
+(b) 
+
+
+
+Figure 1: One training iteration of GPT-3 1.3B with 4 pipeline stages (partitioned with minimum imbalance ratio) and 6 microbatches on NVIDIA A100 GPUs drawn to scale.
+For example, F5 and B5 in the S2 row denote Forward and Backward for the fifth microbatch on Stage 2.
+The critical path of computation is traced with a blue line.
+Colors are average power consumption.
+The blue background indicates that GPUs consume power when blocking on communication.
+
+
+
+
+
+Model
+Size
+Imbalance Ratio
+
+
+4 stages
+8 stages
+
+
+GPT-3 [11]
+3B
+1.13
+1.25
+
+
+7B
+1.11
+1.23
+
+
+13B
+1.08
+1.17
+
+
+175B
+1.02
+1.03
+
+
+Bloom [66]
+3B
+1.13
+1.25
+
+
+7B
+1.13
+1.25
+
+
+176B
+1.05
+1.10
+
+
+BERT [15]
+0.1B
+1.33
+2.00
+
+
+0.3B
+1.17
+1.33
+
+
+T5 [51]
+0.2B
+1.19
+1.50
+
+
+0.7B
+1.05
+1.11
+
+
+2.9B
+1.06
+1.16
+
+
+
+Wide-ResNet50 [69]
+
+0.8B
+1.23
+1.46
+
+
+
+Wide-ResNet101 [69]
+
+1.5B
+1.09
+1.25
+
+
+
+Table 1: Imbalance ratio between the longest and the shortest stages for various models on NVIDIA A100 GPUs. 1.00 would mean perfect balance.
+
+
+We profile GPT-3 1.3B on NVIDIA A100 GPUs and visualize the timeline of one training iteration in Figure 1(a).
+In addition to the familiar bubbles found in any pipeline schedule [41], we observe gaps in between forward and backward computations, where the GPU is simply blocking on communication with an adjacent stage.
+Such gaps exist because the computation time of each pipeline stage is not perfectly balanced.
+Partitioning stages in a balanced manner is an important problem in distributed execution planning [26, 41, 19, 73], but perfect balancing is difficult because DNNs are essentially a sequence of coarse-grained tensor operations with varying size.
+
+
+To understand the amount of possible pipeline stage imbalance, we exhaustively enumerated all possible pipeline partitions111For Transformer-based models, we partition at the granularity of Transformer layers. For Wide-ResNet, we partition at the granularity of bottleneck layers, which are three Convolution layers wrapped with a Skip connection. to find the one with the smallest imbalance ratio, defined as the ratio of the longest stage forward computation latency to the shortest.
+Table 1 lists the minimum imbalance ratio for various models, which shows that perfect balance is difficult to achieve.
+Appendix A explains the partitioning details of each model and where imbalance comes from.
+
+
+Given some amount of stage imbalance, as we have seen in Figure 1(a), not all forward and backward computations are on the critical path of computation.
+This means that non-critical computations running at their maximum speed is not contributing to faster iteration time, and thus simply wasting energy.
+We call this intrinsic energy bloat, which can be reduced by precisely slowing down each non-critical computation so that they do not affect the critical path (Figure 1(b)).
+Although seemingly simple, we prove that this problem is NP-hard by reduction from the 0/1 Knapsack problem (Appendix B).
+Visualizations for other models are in Appendix C.
+
+
+
+
+2.3 Extrinsic Energy Bloat
+
+During large model training, numerous replicas of the same pipeline run in a data parallel fashion in order to train on more data with more GPUs, and every pipeline must synchronize gradients at the end of each iteration before moving on to the next.
+When one pipeline runs slower, all other pipelines must wait until the straggler pipeline finishes.
+Figure 2(a) illustrates this situation.
+Since the straggler pipeline determines end-to-end iteration time, all other pipelines running at their fastest possible iteration time are wasteful.
+We call this extrinsic energy bloat, because unlike intrinsic energy bloat, the cause of energy bloat is extrinsic to the pipeline.
+
+
+Perseus finds the energy-optimal iteration time for the non-straggler pipeline, again by precisely slowing down computations in the pipeline (Figure 2(b)).
+However, unlike other problem settings that do not consider energy consumption, we show in Section 3.1 that fully utilizing all the slack time created by the straggler may not be energy-optimal!
+Perseus can automatically make such decisions and implements the energy-optimal slowdown.
+
+
+
+
+
+(a) 
+
+
+
+
+
+(b) 
+
+
+
+Figure 2: Toy example illustrating one straggler pipeline running together with a non-straggler pipeline using data parallelism.
+The non-straggler wastes energy by running as fast as possible.
+Perseus can precisely slow down non-straggler pipelines to reduce such extrinsic energy bloat.
+
+
+Stragglers arise from numerous sources, with many introducing sizable energy bloat according to recent reports.
+Thermal or power throttling in a datacenter may lower the GPU’s frequency to prevent hardware or the power supply unit from being damaged, resulting in 10–50% slowdown [75, 47, 35, 54, 46].
+I/O bottlenecks in the storage or network, especially during data loading for image, video, or recommendation models, can be longer than GPU computation by up to 4×4\times [39, 71], thereby acting like a persistent (virtual) straggler pipeline.
+Recent failure-resilient large model training frameworks [61, 27] deploy heterogeneous pipelines with different number of stages or amount of compute after failures, introducing non-uniform iteration times across pipelines until recovery.
+As the scale of large model training jobs increase, the probability of the job encountering one or more causes of stragglers increases [22, 28, 64].
+
+
+Stragglers due to events like thermal/power throttling, consistent I/O bottlenecks, and fault-tolerant planning can persist across many iterations [46, 39, 27].
+A training system can identify such stragglers and calculate the extent of slowdown by comparing iteration times across data-parallel pipelines.
+In this work, we assume that such knowledge is available and focus on how to plan time and energy consumption across time and allow quick adaptation given such information.
+
+
+
+
+
+
+3 Perseus Overview
+
+Perseus is an energy optimization system for large model training.
+In this section, we present our unified optimization framework that aims to remove both types of energy bloat (§3.1) and walk through the workflow of Perseus (§3.2).
+
+
+
+3.1 Optimization Approach
+
+
+
+
+(a) 
+
+
+
+
+(b) 
+
+
+
+
+
+(c) 
+
+
+
+Figure 3: Three cases of where the straggler pipeline’s iteration time T′superscript𝑇′T^{\prime} can be. The first case is when there are no stragglers. Tminsubscript𝑇T_{\min} and T∗superscript𝑇T^{*} are the shortest and longest iteration time on the “iteration time–energy” Pareto frontier. The black dot is the default mode of execution where all computations run at the maximum speed. The green dot is the energy-optimal iteration time of the non-straggler pipeline.
+
+
+Intuitively, slowing down computations selectively in a training pipeline without affecting its critical path will keep the same iteration time while reducing its energy consumption (§2.2).
+Furthermore, when stragglers emerge, slowing down computations in a non-straggler pipeline without making it a straggler itself will reduce energy consumption even more (§2.3).
+We formalize these two intuitions into a unified optimization framework and derive a universal prescription for a non-straggler pipeline’s energy-optimal iteration time.
+
+
+By controlling the execution speed of individual computations in the pipeline, our goal is to minimize the energy consumption of a pipeline, and we can safely slow down a pipeline’s iteration time until the straggler’s iteration time T′superscript𝑇′T^{\prime}:
+
+
+
+
+minFsubscript𝐹\displaystyle\min_{F}
+Energy​(F)Energy𝐹\displaystyle\quad\textrm{Energy}(F)
+
+(1)
+
+
+
+s.t.
+Time​(F)≤T′Time𝐹superscript𝑇′\displaystyle\quad\textrm{Time}(F)\leq T^{\prime}
+
+
+
+
+where F𝐹F is the set of GPU frequencies to run each forward and backward computation in the pipeline, and Time​(F)Time𝐹\textrm{Time}(F) and Energy​(F)Energy𝐹\textrm{Energy}(F) are the iteration time and energy consumption of the pipeline when executed with F𝐹F, respectively.
+Changing F𝐹F will lead to different values of Time​(F)Time𝐹\textrm{Time}(F) and Energy​(F)Energy𝐹\textrm{Energy}(F) on the “iteration time–energy” 2D plane.
+However, we are only interested in (Time​(F)Time𝐹\textrm{Time}(F), Energy​(F)Energy𝐹\textrm{Energy}(F)) points that are on the “iteration time–energy” Pareto frontier, a monotonically decreasing tradeoff curve.
+
+
+Figure 3 depicts the three cases where the straggler’s iteration time T′superscript𝑇′T^{\prime} can possibly be w.r.t. the “iteration time–energy” Pareto frontier.
+Tm​i​nsubscript𝑇𝑚𝑖𝑛T_{min} is the shortest iteration time on the frontier, which coincides with the iteration time of running every computation at the maximum speed, and T∗superscript𝑇T^{*} is the iteration time with minimum energy consumption.
+Together, Tminsubscript𝑇T_{\min} and T∗superscript𝑇T^{*} bookend the Pareto frontier.
+
+
+
+
+1.
+
+When there are no stragglers (Figure 3(a)), we simply operate on the point on the Pareto frontier with the same iteration time, which reduces intrinsic energy bloat.
+
+
+
+2.
+
+When a moderately slow straggler is detected (Figure 3(b)), we additionally reduce extrinsic energy bloat by slowing down non-straggler pipelines until T′superscript𝑇′T^{\prime}, using up all the slack time created by the straggler.
+
+
+
+3.
+
+Finally, when the straggler’s iteration time goes beyond the minimum-energy point T∗superscript𝑇T^{*} on the frontier (Figure 3(c)), we stop at T∗superscript𝑇T^{*} instead of T′superscript𝑇′T^{\prime}.
+This is because slowing down beyond T∗superscript𝑇T^{*} will instead increase energy.
+
+
+
+
+
+The three cases can be merged into one universal prescription for the pipeline’s energy-optimal iteration time:
+
+
+
+
+Topt=min⁡(T∗,T′).subscript𝑇optsuperscript𝑇superscript𝑇′\displaystyle T_{\textrm{opt}}=\min(T^{*},T^{\prime}).
+
+(2)
+
+
+
+Therefore, if we pre-characterize the entire “iteration time–energy” Pareto frontier, we know the solution of Equation 1 for any feasible value of T′superscript𝑇′T^{\prime}.
+Then our system will be able to react quickly to emerging stragglers by simply looking up the set of frequencies Foptsubscript𝐹optF_{\textrm{opt}} that leads to iteration time Toptsubscript𝑇optT_{\textrm{opt}}.
+We present our algorithm to efficiently characterize the entire “iteration time–energy” Pareto frontier in Section 4.
+
+
+
+
+3.2 Perseus Architecture
+
+Energy Schedule.
+
+Perseus represents each iteration of the training pipeline as a static directed acyclic graph (DAG), where nodes are forward and backward computations and edges are dependencies in between computations.
+Each node on the computation DAG is annotated with its planned time and energy consumption, which we call the energy schedule.
+Perseus realizes an energy schedule by executing each computation with a specific GPU frequency.
+
+
+
+System Components.
+
+Figure 4 shows the high-level architecture of Perseus.
+Perseus is split into a framework-independent server and a framework-integrated client.
+The server runs our time–energy optimization algorithm, produces all energy schedules on the “iteration time–energy” Pareto frontier, and caches them in a table for fast lookup.
+The client profiles computations of the pipelines online during training, and realizes the energy schedule by changing the GPU’s frequency during runtime.
+
+
+Figure 4: Perseus architecture and workflow.
+
+
+
+Training Lifecycle Using Perseus.
+
+In Perseus, a training job is specified by its computation DAG.
+When the job begins execution,  1 the Perseus client invokes its Online Time/Energy Profiler (§5) to measure the time and energy consumption of each forward and backward computation in each stage while training is running, and sends the profile to the server.
+
+
+As training proceeds,  2 the server asynchronously characterizes the “iteration time–energy” Pareto frontier of the training job (§4), after which  3 the Pareto-optimal energy schedule corresponding to the shortest possible iteration time Tminsubscript𝑇T_{\min} is deployed to the client.
+Energy schedules are realized by the client’s Asynchronous Frequency Controller, integrated into the training framework’s pipeline execution engine (§5).
+Pareto-optimal energy schedules are saved in a lookup table format index by T′superscript𝑇′T^{\prime}.
+
+
+During training,  4 the hardware infrastructure (e.g., data center rack power manager) notifies the Perseus server of a straggler pipeline and how much slowdown it will experience.
+The Perseus server can  5 quickly react to this by looking up the Pareto-optimal energy schedule corresponding to that straggler iteration time, and deploying it to the clients.
+
+
+
+
+
+
+
+4 Algorithm Design
+
+In this section, we describe our algorithm to obtain the “iteration time–energy” Pareto frontier for a training pipeline in detail.
+We start by formulating the problem (§4.1).
+Then, we provide an overview of our algorithm (§4.2) and describe the core subroutine in our algorithm (§4.3).
+Finally, we extend our algorithm to support tensor parallelism, single-choice operations, and diverse pipeline schedules (§4.4).
+
+
+
+4.1 Problem Formulation
+
+Expression for Energy Consumption.
+
+The energy consumption of a pipeline is not only from computation; it is the sum of three parts:
+(1) Computation;
+(2) Blocking on communication between computations; and
+(3) Blocking on communication until the straggler pipeline finishes.
+Formally,
+
+
+
+
+
+∑iei​(fi)+Pblocking​(N⋅T−∑iti​(fi))+Pblocking⋅N⋅(T′−T)subscript𝑖subscript𝑒𝑖subscript𝑓𝑖subscript𝑃blocking⋅𝑁𝑇subscript𝑖subscript𝑡𝑖subscript𝑓𝑖⋅subscript𝑃blocking𝑁superscript𝑇′𝑇\displaystyle\sum_{i}{e_{i}(f_{i})}+P_{\textrm{blocking}}(N\cdot T-\sum_{i}{t_{i}(f_{i})})+P_{\textrm{blocking}}\cdot N\cdot(T^{\prime}-T)
+
+(3)
+
+
+
+
+=∑i(ei​(fi)−Pblocking⋅ti​(fi))¯1+Pblocking⋅N⋅T′¯2absent1¯subscript𝑖subscript𝑒𝑖subscript𝑓𝑖⋅subscript𝑃blockingsubscript𝑡𝑖subscript𝑓𝑖2¯⋅subscript𝑃blocking𝑁superscript𝑇′\displaystyle=\underset{\leavevmode\hbox to8.53pt{\vbox to8.53pt{\pgfpicture\makeatletter\hbox{\hskip 4.26347pt\lower-4.26347pt\hbox to0.0pt{\pgfsys@beginscope\pgfsys@invoke{ }\definecolor{pgfstrokecolor}{rgb}{0,0,0}\pgfsys@color@rgb@stroke{0}{0}{0}\pgfsys@invoke{ }\pgfsys@color@rgb@fill{0}{0}{0}\pgfsys@invoke{ }\pgfsys@setlinewidth{0.4pt}\pgfsys@invoke{ }\nullfont\hbox to0.0pt{\pgfsys@beginscope\pgfsys@invoke{ }{
+{{}}\hbox{\hbox{{\pgfsys@beginscope\pgfsys@invoke{ }{{}{{{}}}{{}}{}{}{}{}{}{}{}{}{}{{}\pgfsys@moveto{4.06348pt}{0.0pt}\pgfsys@curveto{4.06348pt}{2.24422pt}{2.24422pt}{4.06348pt}{0.0pt}{4.06348pt}\pgfsys@curveto{-2.24422pt}{4.06348pt}{-4.06348pt}{2.24422pt}{-4.06348pt}{0.0pt}\pgfsys@curveto{-4.06348pt}{-2.24422pt}{-2.24422pt}{-4.06348pt}{0.0pt}{-4.06348pt}\pgfsys@curveto{2.24422pt}{-4.06348pt}{4.06348pt}{-2.24422pt}{4.06348pt}{0.0pt}\pgfsys@closepath\pgfsys@moveto{0.0pt}{0.0pt}\pgfsys@stroke\pgfsys@invoke{ }
+}{{{{}}\pgfsys@beginscope\pgfsys@invoke{ }\pgfsys@transformcm{1.0}{0.0}{0.0}{1.0}{-2.5pt}{-3.22221pt}\pgfsys@invoke{ }\hbox{{\definecolor{pgfstrokecolor}{rgb}{0,0,0}\pgfsys@color@rgb@stroke{0}{0}{0}\pgfsys@invoke{ }\pgfsys@color@rgb@fill{0}{0}{0}\pgfsys@invoke{ }\hbox{{1}}
+}}\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope}}}
+\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope}}}
+}
+\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope{{{}}}{}{}\hss}\pgfsys@discardpath\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope\hss}}\lxSVG@closescope\endpgfpicture}}}{\underline{\sum_{i}{\left(e_{i}(f_{i})-P_{\textrm{blocking}}\cdot t_{i}(f_{i})\right)}}}+\underset{\leavevmode\hbox to8.53pt{\vbox to8.53pt{\pgfpicture\makeatletter\hbox{\hskip 4.26347pt\lower-4.26347pt\hbox to0.0pt{\pgfsys@beginscope\pgfsys@invoke{ }\definecolor{pgfstrokecolor}{rgb}{0,0,0}\pgfsys@color@rgb@stroke{0}{0}{0}\pgfsys@invoke{ }\pgfsys@color@rgb@fill{0}{0}{0}\pgfsys@invoke{ }\pgfsys@setlinewidth{0.4pt}\pgfsys@invoke{ }\nullfont\hbox to0.0pt{\pgfsys@beginscope\pgfsys@invoke{ }{
+{{}}\hbox{\hbox{{\pgfsys@beginscope\pgfsys@invoke{ }{{}{{{}}}{{}}{}{}{}{}{}{}{}{}{}{{}\pgfsys@moveto{4.06348pt}{0.0pt}\pgfsys@curveto{4.06348pt}{2.24422pt}{2.24422pt}{4.06348pt}{0.0pt}{4.06348pt}\pgfsys@curveto{-2.24422pt}{4.06348pt}{-4.06348pt}{2.24422pt}{-4.06348pt}{0.0pt}\pgfsys@curveto{-4.06348pt}{-2.24422pt}{-2.24422pt}{-4.06348pt}{0.0pt}{-4.06348pt}\pgfsys@curveto{2.24422pt}{-4.06348pt}{4.06348pt}{-2.24422pt}{4.06348pt}{0.0pt}\pgfsys@closepath\pgfsys@moveto{0.0pt}{0.0pt}\pgfsys@stroke\pgfsys@invoke{ }
+}{{{{}}\pgfsys@beginscope\pgfsys@invoke{ }\pgfsys@transformcm{1.0}{0.0}{0.0}{1.0}{-2.5pt}{-3.22221pt}\pgfsys@invoke{ }\hbox{{\definecolor{pgfstrokecolor}{rgb}{0,0,0}\pgfsys@color@rgb@stroke{0}{0}{0}\pgfsys@invoke{ }\pgfsys@color@rgb@fill{0}{0}{0}\pgfsys@invoke{ }\hbox{{2}}
+}}\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope}}}
+\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope}}}
+}
+\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope{{{}}}{}{}\hss}\pgfsys@discardpath\pgfsys@invoke{\lxSVG@closescope }\pgfsys@endscope\hss}}\lxSVG@closescope\endpgfpicture}}}{\underline{\vphantom{\sum_{i}}P_{\textrm{blocking}}\cdot N\cdot T^{\prime}}}
+
+
+
+
+where Pblockingsubscript𝑃blockingP_{\textrm{blocking}} is the power consumption of the GPU when it is blocking on communication, N𝑁N is the number of pipeline stages, and ti​(fi)subscript𝑡𝑖subscript𝑓𝑖t_{i}(f_{i}) and ei​(fi)subscript𝑒𝑖subscript𝑓𝑖e_{i}(f_{i}) are the time and energy consumption of computation i𝑖i with frequency fisubscript𝑓𝑖f_{i}, respectively.
+
+
+Equation 3 shows that the “iteration time–energy” Pareto frontier of a pipeline depends on the straggler’s iteration time T′superscript𝑇′T^{\prime} in  2.222This makes sense because if the straggler slows down more and more, the non-straggler will consume more energy waiting for the straggler to finish.
+Specifically, the Pareto frontier for any T′superscript𝑇′T^{\prime} is the Pareto frontier of Time​(F)Time𝐹\textrm{Time}(F) vs.  1 shifted upwards by  2.
+Here,  1 does not depend on T′superscript𝑇′T^{\prime}.
+Therefore, if we characterize the Pareto frontier of Time​(F)Time𝐹\textrm{Time}(F) vs.  1, that frontier can be used to find Toptsubscript𝑇optT_{\textrm{opt}} and Foptsubscript𝐹optF_{\textrm{opt}} for any value of T′superscript𝑇′T^{\prime} as shifting the frontier upwards does not affect iteration time nor the frequency assignments that lead to each iteration time.
+Thus, we define
+
+
+
+Energy​(F)=∑i(ei​(fi)−Pblocking⋅ti​(fi))Energy𝐹subscript𝑖subscript𝑒𝑖subscript𝑓𝑖⋅subscript𝑃blockingsubscript𝑡𝑖subscript𝑓𝑖\textrm{Energy}(F)=\sum_{i}{\left(e_{i}(f_{i})-P_{\textrm{blocking}}\cdot t_{i}(f_{i})\right)}
+
+(4)
+
+
+and characterize the Pareto frontier of Time​(F)Time𝐹\textrm{Time}(F) vs. Energy​(F)Energy𝐹\textrm{Energy}(F).
+
+
+
+Finding the Pareto Frontier.
+
+Finding one point on the “iteration time–energy” Pareto frontier with iteration time T′superscript𝑇′T^{\prime} is equivalent to solving the following optimization problem:
+
+
+
+
+minFsubscript𝐹\displaystyle\min_{F}
+Energy​(F)Energy𝐹\displaystyle\quad\textrm{Energy}(F)
+
+(5)
+
+
+
+s.t.
+Time​(F)≤T′Time𝐹superscript𝑇′\displaystyle\quad\textrm{Time}(F)\leq T^{\prime}
+
+
+
+
+We call this problem Pipeline Energy Minimization (PEM).
+
+
+
+Theorem 1.
+
+
+Pipeline Energy Minimization is NP-hard.
+
+
+
+Proof.
+
+Reduction from 0/1 Knapsack. Details in Appendix B.
+∎
+
+
+
+The complete Pareto frontier can be obtained by solving PEM for all T′∈[Tmin,T∗]superscript𝑇′subscript𝑇superscript𝑇T^{\prime}\in[T_{\min},T^{*}], which is clearly intractable.
+Therefore, we seek an appropriate relaxation of the problem.
+
+
+One of the reasons PEM is NP-hard is because it is a discrete optimization problem where the possible choices of computation time and energy are discrete, which is in turn because the possible choices of GPU frequencies are discrete.
+However, if choices were continuous, the problem is exactly and efficiently solvable [57].
+This is akin to integer linear programs becoming tractable when relaxed to linear programs.
+
+
+We fit the exponential function (a⋅eb​t+c⋅𝑎superscript𝑒𝑏𝑡𝑐a\cdot e^{bt}+c) to Pareto-optimal computation time and energy measurements to make the choices continuous.
+We choose the exponential function due to its inherent flexibility and natural fit to data.
+We show in Section 6 that this relaxation produces high-quality approximate solutions that lead to actual savings.
+After relaxation, the problem’s optimization variables are the time and energy consumption planned for each computation in the pipeline, or the energy schedule.
+
+
+
+
+
+4.2 Algorithm Overview
+
+Iteratively Discovering the Pareto Frontier.
+
+Figure 5: Starting from the Pareto-optimal energy schedule that consumes the minimum energy, we iteratively reduce its iteration time to trace up the Pareto frontier.
+
+
+While the relaxed Pipeline Energy Minimization problem is no longer NP-Hard, solving the problem for each T′∈[Tmin,T∗]superscript𝑇′subscript𝑇superscript𝑇T^{\prime}\in[T_{\min},T^{*}] from scratch is inefficient.
+Instead, what if we can tweak an energy schedule that is already Pareto-optimal to generate the next energy schedule adjacent to it on the Pareto frontier?
+Then, we can start from one end of the Pareto frontier and trace along the frontier to the other end, and every energy schedule we encounter will be Pareto-optimal.
+
+
+We visualize our strategy of navigating the Pareto frontier in Figure 5.
+We start from the energy schedule that consumes the minimum energy at T∗superscript𝑇T^{*}, which is achieved simply by running every computation with the minimum energy.333The minimum energy consumption for each computation type can be queried from computation time/energy profiling information (§5).
+This energy schedule is Pareto-optimal because there are no other plans that achieve the same amount of energy consumption with faster iteration time.
+Then, we iteratively reduce the pipeline’s iteration time by unit time τ𝜏\tau (e.g., 1 ms) while increasing total energy minimally, which gives us the next Pareto-optimal energy schedule.444τ𝜏\tau is the unit time parameter that trades off the running time of Perseus’s scheduler and the granularity of energy schedules discovered by Perseus.
+This process is repeated until iteration time reaches Tminsubscript𝑇T_{\min}.
+
+
+We note that starting from the energy schedule that consumes the maximum energy (i.e., the black dot) is incorrect.
+That energy schedule is not Pareto-optimal because, although it will execute with the least amount of time, stage imbalance leaves room for energy reduction (§2.2).
+
+
+
+TL;DR.
+
+
+
+1
+
+
+2 
+
+
+3
+
+
+Input: DAG 𝒢𝒢\mathcal{G} of computations i∈𝒢𝑖𝒢i\in\mathcal{G}
+Amount of time to reduce in one iteration τ𝜏\tau
+Iteration time with all max frequencies Tminsubscript𝑇T_{\min}
+
+
+Output: Set of Pareto-optimal energy schedules 𝒫𝒫\mathcal{P}
+
+
+4
+
+
+5 
+
+
+6
+
+
+▷▷\triangleright Begin with the minimum energy schedule 
+
+
+7
+p←←𝑝absentp\leftarrow Minimum energy for all computations
+
+
+8
+𝒫←{p}←𝒫𝑝\mathcal{P}\leftarrow\{p\}
+
+
+9
+
+
+10while IterationTime​(𝒢,p)>TminIterationTime𝒢𝑝subscript𝑇\mathrm{IterationTime}(\mathcal{G},p)>T_{\min} do
+
+      
+▷▷\triangleright Reduce time by τ𝜏\tau with minimal energy increase (§4.3) 
+
+
+11      
+p←←𝑝absentp\leftarrow ReduceTime(𝒢𝒢\mathcal{G}, p𝑝p, τ𝜏\tau)
+
+
+12      
+𝒫←𝒫∪{p}←𝒫𝒫𝑝\mathcal{P}\leftarrow\mathcal{P}\cup\{p\}
+
+
+13      
+
+
+
+14 end while
+
+
+15
+
+
+▷▷\triangleright Every schedule in 𝒫𝒫\mathcal{P} is Pareto-optimal 
+
+
+16
+return 𝒫𝒫\mathcal{P}
+
+
+17 
+
+
+18
+
+
+
+
+Algorithm 1 Iteratively Discovering the Pareto Frontier.
+
+
+Algorithm 1 provides an overview of our optimization process.
+First, the energy schedule with the minimum energy consumption is constructed by planning every computation to run with minimum energy (line 1).
+Starting from there, the iteration time of the schedule is iteratively reduced by unit time τ𝜏\tau while incurring minimal energy increase (line 1; Section 4.3).
+This is repeated until the total iteration time of the schedule can no longer be reduced, and every energy schedule encountered in the process is Pareto-optimal.
+
+
+
+
+
+4.3 Reducing Time with Minimum Energy Increase
+
+Figure 6: A simplified example of how to reduce iteration time by unit time τ𝜏\tau.
+Given a 1F1B pipeline schedule with 2 stages and 3 microbatches ( 1), it is first transformed to an equivalent representation of computation DAG ( 2).
+Then the Critical DAG ( 3) is obtained by considering every and only the computations on the critical path.
+Our key observation is that any valid s-t cut on the Critical DAG will reduce the iteration time by unit time τ𝜏\tau.
+Cut A and Cut B are two examples of valid s-t cut ( 4).
+Either reducing the one computation associated with Cut A (
+5A
+) or reducing the two computations associated with Cut B (
+5B
+) reduces the iteration time by τ𝜏\tau.
+
+
+
+In this section, we describe our core subroutine ReduceTime (Algorithm 1, line 1).
+Figure 6 provides visualizations of the process.
+The entire procedure is given in Algorithm 2.
+
+
+Node- and Edge-Centric Computation DAGs.
+
+Originally, Perseus’s representation of the computation DAG is node-centric, which has forward and backward computations as nodes and their dependencies as edges.
+As a setup for subsequent steps, we convert this into an edge-centric computation DAG where computations are edges and dependencies are nodes (i.e., all incoming edges must complete before any outgoing edge can begin).
+This conversion can be done by splitting each node on the original computation DAG into two nodes and connecting the two with an edge annotated with the computation on the original node.
+
+
+
+Removing Non-Critical Computations.
+
+Our goal is to reduce the execution time of the computation DAG by τ𝜏\tau, which is equivalent to reducing the length of all critical paths by τ𝜏\tau.
+Since computations that are not on any critical path (i.e., non-critical computations) do not affect the length of the critical path, we simply remove them from the computation DAG.
+
+
+
+Finding Computations to Speed Up.
+
+Which computations on the DAG should we speed up in order to reduce the length of all critical paths by τ𝜏\tau?
+The key observation is that any s-t cut on the computation DAG represents a way to reduce the execution time of the DAG by τ𝜏\tau.
+Specifically, by speeding up the computations on all cut edges by τ𝜏\tau, the entire computation DAG can be sped up exactly by τ𝜏\tau.
+
+
+Figure 6 shows two examples of this.
+We have already  1 transformed an energy schedule into  2 a computation DAG where computations are represented by edges, and  3 removed all non-critical computations.
+Here,  4 shows two valid s-t cuts: Cut A and Cut B.
+ 5A speeds up the Backward computation cut by Cut A from 3​τ3𝜏3\tau to 2​τ2𝜏2\tau, and the iteration time of the energy schedule was reduced by τ𝜏\tau.
+Similarly,  5B speeds up the Forward computation and Backward computation defined by Cut B from 5​τ5𝜏5\tau to 4​τ4𝜏4\tau and from 7​τ7𝜏7\tau to 6​τ6𝜏6\tau respectively, and the iteration time of the energy schedule was also reduced by τ𝜏\tau.
+Especially, in the second case, iteration time was only reduced because computations on two parallel critical paths were sped up together.
+
+
+
+Solving with Minimum Cut.
+
+We have shown with examples that any s-t cut represents a way to reduce the duration of the computation DAG by τ𝜏\tau.
+Then, a natural question is, which cut brings the smallest possible energy increase?
+
+
+We can precisely map the capacity of an s-t cut to the amount of energy increase from speeding up cut edges by finding the amount of energy increase each computation will incur with the slope of the exponential function fit for that computation and defining it to be the edge’s flow capacity.
+Then, our problem reduces to minimum cut, which we can solve with maximum flow.
+Appendix D has further details.
+
+
+
+Converting to GPU Frequencies.
+
+After finding the minimum capacity (minimum energy increase) cut, we will modify the durations of the computations involved in the cut, which results in a new energy schedule.
+Finally, we will convert the energy schedule into GPU frequencies that can be realized by the Perseus client.
+For each computation i𝑖i, we convert its execution time t𝑡t to the slowest GPU frequency that will execute faster than t𝑡t. This is because when computations are tightly packed by our algorithm, while slightly speeding up a computation is acceptable, slowing down any computation on the critical path will directly slow down the entire DAG, increasing intrinsic energy bloat.
+
+
+
+Time Complexity Analysis.
+
+Our optimization algorithm has polynomial runtime.
+Let N𝑁N and M𝑀M respectively denote the number of stages and microbatches.
+Then, the computation DAG will have O​(N​M)𝑂𝑁𝑀O(NM) number of nodes and edges, and maximum flow with Edmonds-Karp runs in O​(N3​M3)𝑂superscript𝑁3superscript𝑀3O(N^{3}M^{3}).
+While for general DAGs the total number of steps is known to be exponential to the size of the DAG [58], we prove that for DAGs that represent pipeline computations, the number of steps is O​(N+M)𝑂𝑁𝑀O(N+M), yielding a final polynomial time complexity of O​((N+M)​N3​M3)𝑂𝑁𝑀superscript𝑁3superscript𝑀3O((N+M)N^{3}M^{3}).
+See Appendix E for proof.
+
+
+In reality, commonly used number of stages (N𝑁N) are 4 to 8 as too many increase pipeline bubble ratio [43, 14].
+The number of microbatches (M𝑀M) is typically around 4​N4𝑁4N [26, 59], but recently with high data parallel degree, far less have been reported even for high-performance settings [14].
+As such, the algorithm runtime is negligible in practical scenarios (§6.5), given that large model training time is typically several weeks [48].
+
+
+
+
+1
+
+
+2 
+
+
+3
+
+
+Input: DAG 𝒢𝒢\mathcal{G} with computations i𝑖i
+Current energy schedule p𝑝p
+Amount of iteration time to reduce τ𝜏\tau
+
+
+Output: Pareto-optimal schedule with reduced time p′superscript𝑝′p^{\prime}
+
+
+4
+
+
+5 
+
+
+6
+
+
+Function ReduceTimeReduceTime\mathrm{ReduceTime}(𝒢𝒢\mathcal{G}, p𝑝p, τ𝜏\tau):
+
+      
+▷▷\triangleright Construct edge-centric computation DAG ( 2) 
+
+
+7      
+𝒢←←𝒢absent\mathcal{G}\leftarrow Split nodes into two and connect with edge
+
+
+8      
+𝒢←←𝒢absent\mathcal{G}\leftarrow Crash bipartite node set to one node
+
+
+9      
+
+
+      ▷▷\triangleright Remove non-critical computations ( 3) 
+
+
+10      
+Annotate earliest & latest start times for ∀i∈𝒢for-all𝑖𝒢\forall i\in\mathcal{G}
+
+
+11      
+for i∈𝒢𝑖𝒢i\in\mathcal{G} do
+
+            
+▷▷\triangleright Critical computations should have zero slack 
+
+
+12            
+if i𝑖i has different earliest and latest start then
+
+
+13                  
+Remove i𝑖i from 𝒢𝒢\mathcal{G}
+
+
+14                  
+
+
+
+15             end if
+
+
+16            
+
+
+17       end for
+
+
+18      
+
+      ▷▷\triangleright Find set of computations to modify ( 4) 
+
+
+19      
+S𝑆S, T←←𝑇absentT\leftarrow FindMinCut(𝒢𝒢\mathcal{G}, p𝑝p)
+
+
+20      
+
+
+      ▷▷\triangleright Modify computation durations ( 5) 
+
+
+21      
+I←{i∣i​ in ​S−T​ cut}←𝐼conditional-set𝑖𝑖 in 𝑆𝑇 cutI\leftarrow\{i\mid i\textrm{ in }S-T\textrm{ cut}\}
+
+
+22      
+Modify duration of ∀i∈Ifor-all𝑖𝐼\forall i\in I by τ𝜏\tau
+
+
+23      
+
+
+      ▷▷\triangleright Assign frequencies from planned computation times 
+
+
+24      
+p′←←superscript𝑝′absentp^{\prime}\leftarrow min⁡fisubscript𝑓𝑖\min f_{i} that runs no slower than planned
+
+
+25      
+
+
+
+26      return p′superscript𝑝′p^{\prime}
+
+
+27
+
+
+28
+
+
+29 
+
+
+30
+
+
+
+
+Algorithm 2 ReduceTime: Reducing the execution time of a computation DAG by τ𝜏\tau with minimal energy increase.
+
+
+
+
+
+4.4 Extensions
+
+In this section, we present extensions to our optimization algorithm useful for planning large model training.
+
+
+Tensor Parallelism.
+
+It is trivial to extend our algorithm to tensor parallelism, another essential ingredient of large model training.
+The observation is that tensor parallel techniques split operations in equal sizes.
+Therefore, GPUs that execute different portions of the same operation consume the same amount of time and energy.
+This allows Perseus to operate only on one tensor parallelism copy for each stage, decide the energy schedule for that copy, and replicate it to other copies in the same stage.
+We show that Perseus works well for hybrid parallelism in Section 6.4.
+
+
+
+Single-Choice Operations.
+
+Apart from computation and blocking on communication, there are other operations in the training pipeline that may take non-trivial latencies.
+For instance, especially on fast GPUs like A100, loading and copying input data into VRAM or communication over slower links can take considerable latency.
+However, the time and energy consumption of these operations are not affected by the GPU’s frequency.
+Perseus can take the latency of such operations into account during planning by abstracting them as a node in the DAG with only one frequency choice.
+
+
+
+Other Pipeline Schedules.
+
+There are various schedules for pipeline parallel training, including GPipe [26], 1F1B [42], interleaved 1F1B [56], and early recomputation 1F1B [34].
+As long as the computations on the schedule can be expressed as a DAG, Perseus can optimize its energy consumption without modification.
+If there is stage imbalance, we believe that any pipeline schedule will have intrinsic energy bloat.
+
+
+
+
+
+
+
+5 Implementation
+
+The Perseus server is implemented in 1,500 lines of Python [3].
+The client is implemented in 300 lines of Python as a library that can be imported into training frameworks.
+
+
+As a reference, we have integrated the Perseus client with Merak [34], whose open source implementation takes the best of Megatron-LM [5] for high-performance tensor parallelism for transformer models and DeepSpeed [2] for its generic pipeline execution engine.
+Activation recomputation [12] is enabled by default to allow large batch sizes to fit in GPUs.
+
+
+Online Time/Energy Profiler.
+
+While accurate timing measurement is well-supported, modern GPUs (NVIDIA A40, A100, and H100) update their cumulative energy consumption counter [8] only once every 100 ms, which is similar to the timescale of one microbatch computation.
+This makes energy measurement noisy, and no ground truth is available.
+
+
+At the very moment the cumulative energy counter increases, its value should be accurate.
+Therefore, Perseus polls the energy counter in the background and records the timestamp of when the counter increased and its value.
+Then, collected (time, energy) points are interpolated with a linear line.
+The main training process only records the start and end timing of each computation, allowing Perseus to match timestamps with the interpolated energy curve to calculate each computation’s energy consumption.
+
+
+The GPU’s frequency is scanned from the highest to the lowest at iteration granularity.
+As an optimization, when computation energy increases for five consecutive frequencies, profiling is terminated.
+Beyond that point, frequencies will consume more time and energy, making them suboptimal.
+
+
+
+Asynchronous Frequency Controller.
+
+The controller lives in a separate process that communicates with the main training process through a pipe, because setting the GPU’s frequency through NVML [8] should not block computation on the main process.
+While pipeline execution engine implementations differ widely, many have separate code blocks for forward and backward.
+Therefore, the controller exposes one method, set_frequency, which takes either "forward" or "backward" and sets the GPU’s frequency as planned.
+
+
+
+
+
+
+6 Evaluation
+
+We evaluate Perseus on five workloads and compare it against EnvPipe and Zeus.
+Our key findings are the following.
+
+
+
+
+•
+
+Perseus can effectively reduce intrinsic and extrinsic energy bloat.
+Training on real GPUs shows up to 28.5% energy savings using Perseus (§6.2).
+
+
+
+•
+
+In emulated large-scale training scenarios, Perseus significantly outperforms the baselines by consistently providing up to 30% energy savings.
+We also observe that there is a tradeoff between energy savings and scale (§6.3).
+
+
+
+•
+
+Energy bloat reduction was possible because Perseus can enumerate efficient energy schedules on the “iteration time–energy” Pareto frontier (§6.4).
+
+
+
+•
+
+Perseus reduces energy bloat with low overhead (§6.5).
+
+
+
+
+
+
+6.1 Experimental Setup
+
+Testbed.
+
+We run our evaluation workloads in a GPU cluster, where each node is equipped with an AMD EPYC 7513 CPU, 512 GB DRAM, and four NVIDIA A40-48G GPUs.
+For A100 results, we use the node provided by Chameleon Cloud [30], equipped with two Intel Xeon Platinum 8380 CPUs, 512 GB DRAM, and four NVIDIA A100-80G PCIe GPUs.
+
+
+
+Workloads and experiment parameters.
+
+We evaluate Perseus with various workloads spanning from GPT-3 [11], Bloom [66], BERT [15], T5 [51], to Wide-ResNet [69].
+We use model variants with 1.3B to 6.7B parameters to run the models in our testbed, and scale them up to 176B parameters in large-scale emulation.
+We chose the microbatch size and number of microbatches that yield the highest throughput given the global batch size.
+We use the minimum imbalance stage partitioning method described in Section 2.2 for all workloads.
+Appendix A lists complete model configurations, parameters, and stage partitioning details.
+
+
+
+Baselines.
+
+We mainly compare against two prior works:
+
+
+•
+
+EnvPipe [13] reduces only intrinsic energy bloat while trying to minimize slowdown in pipeline execution.
+We compare Perseus’s amount of energy bloat reduction against that of EnvPipe (§6.2, §6.3).
+
+
+
+•
+
+Zeus [68] characterizes the time–energy tradeoff of single GPU training.
+We compare Perseus’s “iteration time–energy” Pareto frontier against that of Zeus (§6.4).
+
+
+
+
+
+
+
+
+6.2 Reducing Energy Bloat
+
+We start with overall energy bloat reduction – both intrinsic (§6.2.1) and extrinsic (§6.2.2) – achieved by Perseus and EnvPipe by running various models on our testbed.
+We compare Perseus against EnvPipe, which reduces energy consumption while trying to minimize slowdown.
+Both solutions use the same amount of GPU resources.
+
+
+
+6.2.1 Intrinsic Energy Bloat Reduction
+
+
+
+
+
+
+
+Model
+Energy Savings (%)
+Slowdown (%)
+
+
+Perseus
+EnvPipe
+Perseus
+EnvPipe
+
+
+
+
+GPT-3 1.3B
+13.2
+8.8
+0.1
+0.1
+
+
+BERT 1.3B
+12.9
+8.0
+0.5
+0.0
+
+
+T5 3B
+10.6
+7.4
+1.3
+3.4
+
+
+Bloom 3B
+11.7
+8.9
+0.2
+0.2
+
+
+Wide-ResNet 1.5B
+3.2
+3.7
+2.3
+4.1
+
+
+
+(a) Four stage pipeline parallelism on A100 GPUs
+
+
+
+
+
+
+
+
+Model
+Energy Savings (%)
+Slowdown (%)
+
+
+Perseus
+EnvPipe
+Perseus
+EnvPipe
+
+
+
+
+GPT-3 2.7B
+21.1
+21.7
+0.2
+5.6
+
+
+BERT 1.3B
+15.7
+16.5
+0.0
+9.7
+
+
+T5 3B
+28.5
+19.3
+0.0
+0.0
+
+
+Bloom 3B
+22.4
+19.9
+0.0
+0.0
+
+
+Wide-ResNet 1.5B
+20.4
+16.5
+0.2
+0.5
+
+
+
+(b) Eight stage pipeline parallelism on A40 GPUs
+
+
+
+Table 2: Intrinsic energy reduction and slowdown comparison between Perseus and EnvPipe.
+
+
+Table 2 compares the energy savings achieved by Perseus’s minimum iteration time energy schedule (leftmost point of the “iteration time–energy” frontier) and that by EnvPipe.
+
+
+We make two observations regarding Perseus.
+First, models show varying amounts of energy savings because their stage imbalance vary (Table 1).
+For instance, unlike other models, Wide-ResNet 1.5B on A100 after minimum imbalance stage partitioning has nearly perfect stage balance, leaving little room for non-critical computations to slow down.
+
+
+Second, A40 demonstrates more energy savings compared to A100.
+This is because the dynamic clock frequency range of A100 (210–1410 MHz) is smaller than that of A40 (210–1740 MHz).
+Thus, tuning down the GPU’s frequency yields a relatively smaller change in computation time and energy compared to those at the maximum frequency.
+However, we expect the upcoming NVIDIA H100 GPU to have better savings because its maximum frequency is 1755 MHz for the PCIe version and 1980 MHz for SXM [44].
+
+
+EnvPipe in general provides lower energy savings, primarily due to its assumption that the final stage of a pipeline is always the heaviest, which is not always true.
+Additionally, it sometimes considerably degrades iteration time because it is not aware of single-choice operations inside the pipeline (§4.4) and can slow down some computations too much.
+
+
+
+
+6.2.2 Intrinsic + Extrinsic Energy Bloat Reduction
+
+
+
+
+
+
+
+Model
+Method
+Energy Savings (%) given T′/Tsuperscript𝑇′𝑇T^{\prime}/T
+
+
+# Params
+1.05
+1.1
+1.2
+1.3
+1.4
+1.5
+
+
+GPT-3
+Perseus
+14.7
+15.9
+15.5
+15.0
+14.6
+14.3
+
+
+1.3B
+EnvPipe
+8.7
+8.5
+8.3
+8.1
+7.9
+7.7
+
+
+Bloom
+Perseus
+13.6
+15.6
+15.2
+14.7
+14.3
+14.0
+
+
+3B
+EnvPipe
+8.8
+8.7
+8.4
+8.2
+8.0
+7.8
+
+
+BERT
+Perseus
+14.9
+16.9
+16.4
+15.9
+15.5
+15.0
+
+
+1.3B
+EnvPipe
+7.9
+7.8
+7.5
+7.3
+7.1
+6.9
+
+
+T5
+Perseus
+15.3
+18.0
+17.9
+17.4
+16.9
+16.5
+
+
+3B
+EnvPipe
+8.4
+8.2
+8.0
+7.8
+7.6
+7.4
+
+
+Wide-ResNet
+Perseus
+9.4
+12.7
+12.6
+12.3
+12.0
+11.6
+
+
+1.5B
+EnvPipe
+4.9
+4.8
+4.7
+4.5
+4.4
+4.3
+
+
+
+(a) Four stage pipeline parallelism on A100 GPUs
+
+
+
+
+
+
+
+
+Model
+Method
+Energy Savings (%) given T′/Tsuperscript𝑇′𝑇T^{\prime}/T
+
+
+# Params
+1.05
+1.1
+1.2
+1.3
+1.4
+1.5
+
+
+GPT-3
+Perseus
+24.5
+26.0
+25.9
+25.2
+24.6
+24.0
+
+
+2.7B
+EnvPipe
+22.9
+22.6
+22.0
+21.4
+20.9
+20.4
+
+
+Bloom
+Perseus
+25.5
+26.4
+25.9
+25.2
+24.6
+24.0
+
+
+3B
+EnvPipe
+19.6
+19.3
+18.8
+18.3
+17.8
+17.4
+
+
+BERT
+Perseus
+20.0
+22.6
+24.1
+23.4
+22.8
+22.2
+
+
+1.3B
+EnvPipe
+19.2
+18.9
+18.3
+17.8
+17.4
+16.9
+
+
+T5
+Perseus
+27.9
+27.3
+26.2
+25.2
+24.3
+23.4
+
+
+3B
+EnvPipe
+18.4
+18.0
+17.3
+16.6
+16.0
+15.4
+
+
+Wide-ResNet
+Perseus
+24.3
+26.2
+26.3
+25.7
+25.0
+24.4
+
+
+1.5B
+EnvPipe
+16.4
+16.2
+15.8
+15.4
+15.0
+14.6
+
+
+
+(b) Eight stage pipeline parallelism on A40 GPUs
+
+
+
+Table 3: Energy savings of Perseus given varying degrees of straggler slowdown (T′/Tsuperscript𝑇′𝑇T^{\prime}/T).
+EnvPipe cannot provide additional savings because it does not consider and cannot be applied to optimize extrinsic bloat.
+
+
+When stragglers create extrinsic energy bloat, the amount of energy savings for a non-straggler pipeline depends on how much energy reduction its time–energy frontier yields for longer iteration times.
+Table 3 shows the amount of energy savings given varying degrees of straggler slowdown.
+As described in Section 3.1, non-stragglers’ iteration time is set to be min⁡(T∗,T′)superscript𝑇superscript𝑇′\min(T^{*},T^{\prime}), and energy is reduced from (1) slowing down the pipeline itself and (2) blocking on communication for a shorter amount of time, waiting for the straggler.
+Slowing down the non-stragglers beyond T∗superscript𝑇T^{*} increases total energy consumption; hence, Perseus does not slow down pipelines further than T∗superscript𝑇T^{*}.
+
+
+The percentage of energy savings increases for lower T′superscript𝑇′T^{\prime} values and slowly wanes when T′>T∗superscript𝑇′superscript𝑇T^{\prime}>T^{*}.
+This reduction is due to longer blocking time.
+That is, the absolute amount of energy savings in Joules is the largest at T∗superscript𝑇T^{*}, and constant afterward.
+However, energy consumption during blocking time (T′−T∗superscript𝑇′superscript𝑇T^{\prime}-T^{*}) increases for larger T′superscript𝑇′T^{\prime} values, lowering the percentage of energy savings for T′>T∗superscript𝑇′superscript𝑇T^{\prime}>T^{*}.
+
+
+Finally, the point of maximum energy savings is different for each model.
+This is because different models have different T∗superscript𝑇T^{*} values, which is determined by how much each stage’s computation slows down on the minimum-energy frequency.
+
+
+
+
+
+6.3 Large-Scale Emulation
+
+Because we do not have access to a GPU cluster required to run huge models like GPT-3 175B, we use emulation grounded on fine-grained profiling for large-scale evaluation.
+
+
+Emulation Methodology.
+
+
+
+
+
+
+
+Total
+
+
+# GPUs
+
+
+
+# Pipelines
+
+
+
+# Microbatches
+
+
+per Pipelines
+
+
+
+
+
+
+Global
+
+
+Batch Size
+
+
+
+
+
+1024
+16
+96
+1536
+
+
+2048
+32
+48
+
+
+4096
+64
+24
+
+
+8192
+128
+12
+
+
+
+Table 4: Experiment parameters for GPT-3 175B and Bloom 176B.
+Each pipeline has tensor parallel degree 8 and 8 pipeline stages.
+
+
+We profile the time and energy consumption of each layer (e.g., Transformer decoder) in GPT-3 175B and Bloom 176B in bfloat16 to construct the time and energy profile of each stage.
+Then, we run our optimization algorithm to obtain a theoretical “iteration time–energy” frontier, and use it to report emulated savings.
+We evaluate the changes in the amount of energy savings in a strong scaling setup presented in Table 4.
+We do not consider weak scaling, where per-pipeline batch is constant and increasing the global batch size proportionally, because varying the global batch size can affect the model quality [31, 21].
+We find that, compared to actual measurements of smaller scale models on A100, the emulator always underestimates the actual percentage of energy savings by 20.2% on average (see Appendix F for details).
+Meaning, the savings reported by our emulation can likely be considered an empirical lower bound for actual savings.
+We used A100 SXM GPUs for the A100 results in this section, which is more representative of large scale scenarios (Appendix G provides PCIe results).
+
+
+
+Results Summary.
+
+
+
+
+(a) 
+
+
+
+
+
+(a) 
+
+
+
+
+
+(b) 
+
+
+
+Figure 7: Energy savings breakdown of large models emulation with straggler slowdown (T′/Tsuperscript𝑇′𝑇T^{\prime}/T) 1.20 and 1,024 GPUs.
+
+
+Figure 7 shows the amount of energy bloat reduction for GPT-3 175B and Bloom 176B large models when slowdown degree is 1.2 on emulated 1,024 GPUs as a representative.
+EnvPipe can only reduce intrinsic bloat as it does not provide an “iteration time–energy” frontier; even for intrinsic bloat, it reduces less than Perseus.
+In contrast, Perseus reduces per-iteration energy consumption by up to 30% by reducing both intrinsic and extrinsic energy bloat.
+
+
+
+Intrinsic Bloat Reduction.
+
+
+
+
+Model
+GPU Type
+
+
+
+Energy Savings (%)
+
+
+given # Microbatches
+
+
+
+
+
+12
+24
+48
+96
+
+
+GPT-3 175B
+A100
+15.20
+14.19
+13.62
+13.32
+
+
+A40
+11.81
+10.22
+9.34
+8.88
+
+
+Bloom 176B
+A100
+10.47
+7.06
+5.23
+4.28
+
+
+A40
+6.97
+4.49
+3.12
+2.41
+
+
+
+Table 5: Perseus’s intrinsic energy bloat reduction of each non-straggler pipeline for GPT-3 175B and Bloom 176B with various number of microbatches. All scenarios run with 8 pipeline stages.
+
+
+Table 5 presents the changes of intrinsic energy bloat saving of a single pipeline in the case of GPT-3 175B and Bloom 176B with respect to various number of microbatches.
+For all models, as more and more microbatches are added to the pipeline, the amount of intrinsic bloat decreases.
+This is fundamentally due to the ratio of microbatches in the pipeline’s warm-up and flush phase (beginning and end) vs. steady state phase (middle).
+Microbatches in the former phase are able to slow down until their minimum energy frequency, yielding large energy savings.
+However, microbatches in the latter (middle of the pipeline) cannot slow down to their full potential when the amount of stage imbalance is not large, thereby yielding modest savings.
+When the number of microbatches in the pipeline increases, only the number of steady state microbatches increases, and energy reduction becomes more and more dominated by the average energy savings of steady state microbatches.
+
+
+
+Extrinsic Bloat Reduction.
+
+
+
+
+(a) 
+
+
+
+
+
+
+
+(a) 
+
+
+
+
+
+(b) 
+
+
+
+
+
+(c) 
+
+
+
+
+
+(d) 
+
+
+
+Figure 8: Perseus’s extrinsic energy savings during a single iteration by slowing down non-straggler pipelines. When T′>T∗superscript𝑇′superscript𝑇T^{\prime}>T^{*}, slowing non-stragglers down starts increasing energy consumption, hence non-stragglers do not slow down further than T∗superscript𝑇T^{*}, whose location is denoted by a star. More blocking time after T∗superscript𝑇T^{*} decreases overall energy savings.
+Please note the different Y-axes.
+
+
+We simulate stragglers in training large models with hybrid parallelism in various strong scaling configurations (Table 4), where a straggler is slower than others in varying degrees from 1.05 to 1.50.
+Other non-stragglers, after finishing their computation, must wait until the straggler finishes computation, where extrinsic energy bloat emerges.
+We measure the amount of energy bloat and Perseus’ extrinsic energy savings.
+
+
+Figure 8 shows the changes of extrinsic energy bloat reduction given varying degrees of straggler slowdown and various strong scale configurations.
+The trend where energy saving increases until T′<T∗superscript𝑇′superscript𝑇T^{\prime}<T^{*} and wanes afterward, is consistent with what was observed in Section 6.2.2.
+
+
+An interesting observation here is that there is a tradeoff between scale and energy savings: more pipelines have less percentage of energy savings or less amount of energy savings per pipeline.
+It may seem intuitive to assume that more pipelines brings more energy savings, as there is only one straggler pipeline that cannot be optimized while all the other pipelines optimize their energy consumption.
+However, this holds only in weak-scaling configuration, i.e., per-pipeline batch size is constant (increasing the global batch size proportionally to the number of pipelines) and it is not the case in strong-scaling configuration, where the global batch size is constant and per-pipeline batch size is decreased as more pipelines deployed.
+With less number of microbatches, the ratio of pipeline bubble (time that GPUs are idle) at the beginning and end of each pipeline iteration, which cannot be eliminated by intrinsic energy bloat reduction, increases, resulting in less energy savings.
+
+
+
+
+
+6.4 Iteration Time–Energy Frontier Comparison
+
+
+
+
+(a) 
+
+
+
+
+(a) 
+
+
+
+
+
+(b) 
+
+
+
+
+(c) 
+
+
+
+Figure 9: Iteration time–energy frontiers for GPT-3, achieved by Perseus and the two baselines derived from Zeus [68]. Perseus Pareto-dominates all other approaches. The dotted vertical line is the iteration time of running all GPUs at their maximum power limit, which is the default mode of operation.
+Please note the different Y-axes.
+
+
+The energy bloat reductions in Sections 6.2 and 6.3 were made possible by the “iteration time–energy” frontier obtained using Perseus’s optimization algorithm.
+Here, we further examine the frontier with different parallelization configurations and models and compare against Zeus [68], which is an energy optimization framework for a single-GPU training with the training time–energy frontier.
+We implemented two Zeus-based baselines to make it work in parallelization configurations and generated “iteration time–energy” frontiers.
+
+
+1.
+
+ZeusGlobal: Scans one global power limit for all stages.
+
+
+
+2.
+
+ZeusPerStage: Sets one power limit per stage that balances forward computation time.
+
+
+
+
+
+We run training and measurement under three parallelization configurations:
+(a) four stage pipeline parallelism on A100;
+(b) eight stage pipeline parallelism on A40; and
+(c) hybrid parallelism (data parallelism 2, tensor parallelism 2, pipeline parallelism 4) on A40.
+Figure 9 shows the frontiers of Perseus and Zeus for different sizes of GPT-3 under three parallelization configurations.
+Frontiers for other models are in Appendix H.
+
+
+Perseus Pareto-dominates Zeus.
+ZeusGlobal is unaware of pipeline stage imbalances and slows down every stage equally, unable to reduce intrinsic energy bloat.
+While ZeusPerStage can balance the forward computation time of each stage, it is unaware of the critical path of the DAG, slowing down critical computations.
+In contrast, Perseus can precisely slow down non-critical computations, tightly packing computation.
+
+
+
+
+6.5 Overhead of Perseus
+
+Profiling.
+
+Our online profiling method (§5) introduces extra training time by running some iterations at a lower frequency.
+For our A100 workloads, the average percentage of slowdown for such iterations was 8.2%, and the average extra training time introduced by profiling was 13 minutes.
+This is negligible compared to how long large model training can take.
+
+
+
+Algorithm Runtime.
+
+The average time spent on running Perseus’s optimization algorithm (§4) across the five A100 workloads was 6.5 minutes, with the longest being Bloom 3B (15.7 minutes).
+For our largest scale emulation experiment (GPT-3 175B on A100 with 8,192 GPUs), the algorithm ran for 87 seconds.
+While the runtime of the algorithm will increase with larger DAGs for larger models, we believe the overhead be justified because training time also increases with the scale of the training job.
+Finding the energy-optimal iteration time and energy schedule given the straggler’s iteration time for extrinsic energy bloat reduction is instant.
+
+
+
+
+
+
+
+7 Related Works
+
+Large Model Training.
+
+Many recent works focus on enabling and accelerating large model training using 3D parallelism (data, tensor, and pipeline parallelism).
+GPipe [26] and PipeDream [41] were the first to introduce pipeline parallelism and explicitly discussed the difficulty of perfectly balancing computation time across stages.
+Megatron-LM [56, 43] is a Transformer-based large model training framework that provides efficient manually designed execution plans.
+Later on, modern training frameworks that focus on large scale training [53, 59, 36, 37, 40, 34] were introduced to support various models at scale. DeepSpeed [53] introduced ZeRO redundancy optimizer that shards model states, which is recently widely used for large model training [52, 72].
+Alpa [73] and GSPMD[70] are automatic parallelization framework for general DNNs.
+Finally, some recent works have looked into fault-tolerant large model training as well [61, 27, 9].
+Unfortunately, energy consumption is not an optimization metric for any of the major large model training frameworks.
+
+
+
+DNN Training and Energy Consumption.
+
+A recent line of work has highlighted the enormous amount of energy consumption and carbon emission of DNN training, including those that present observations and estimations [48, 60, 33, 16, 38] and those that propose optimization methods for training time, energy consumption, and carbon footprint [74, 63, 68, 67, 32, 13].
+
+
+Zeus [68] is a recent work that observes the tradeoff between GPU computation time and energy consumption, but focuses on simple single-GPU training.
+EnvPipe [13], on the other hand, aims to reduce the energy consumption of large model training with minimum slowdown.
+However, its heuristic assumes that the last pipeline stage is always the bottleneck, leading to suboptimal savings and an infinite loop during optimization.
+Perseus Pareto-dominates both Zeus and EnvPipe by viewing large model training as a computation DAG and introducing a principled optimization algorithm.
+Perseus is also the first to introduce the notion of extrinsic energy bloat in large model training and optimize both simultaneously.
+
+
+
+
+
+
+8 Conclusion
+
+We presented Perseus, an energy optimization system for large model training.
+Perseus builds on top of observation that there are fundamental computation imbalance at different levels in large model training that causes intrinsic and extrinsic energy bloat.
+We introduced a principled graph cut-based algorithm that simultaneously reduces both.
+
+
+Perseus advances the state-of-the-art of DNN training energy optimization by establishing a new time–energy Pareto frontier for large model training.
+The integration of Perseus into the training workflow has strong implications for the future of AI development.
+Importantly, reducing energy bloat leads to practically no latency and throughput degradation, which has the potential to greatly enhance the sustainability of distributed training in the midst of recent proliferation of LLMs and GenAI.

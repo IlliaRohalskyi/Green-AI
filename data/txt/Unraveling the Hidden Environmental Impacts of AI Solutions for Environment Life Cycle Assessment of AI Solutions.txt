@@ -1,0 +1,759 @@
+Abstract:
+
+Abstract.
+In the past ten years, artificial intelligence has encountered such dramatic progress that it is now seen as a tool of choice to solve environmental issues and in the first place greenhouse gas emissions (GHG). At the same time the deep learning community began to realize that training models with more and more parameters requires a lot of energy and as a consequence GHG emissions. To our knowledge, questioning the complete net environmental impacts of AI solutions for the environment (AI for Green), and not only GHG, has never been addressed directly. In this article, we propose to study the possible negative impacts of AI for Green. First, we review the different types of AI impacts, then we present the different methodologies used to assess those impacts, and show how to apply life cycle assessment to AI services. Finally, we discuss how to assess the environmental usefulness of a general AI service, and point out the limitations of existing work in AI for Green.
+
+
+
+
+1. Introduction
+
+In the past few years, the AI community has begun to address the environmental impacts of deep learning programs: (Strubell et al.,, 2019) highlighted the impacts of training NLP models in terms of energy consumption and in terms of carbon footprint, (Schwartz et al.,, 2020) proposed the concept of Green AI, and the AI community created several tools to evaluate machine learning energy consumption (Anthony et al.,, 2020; Henderson et al.,, 2020; Lacoste et al.,, 2019; Lannelongue et al.,, 2020).
+
+
+These impacts are mainly expressed in terms of energy consumption and associated greenhouse gas (GHG) emissions. Yet, as we will discuss later, this energy consumption represents only a part of the complete environmental impacts of such methods. (Dilhac et al.,, 2018) for example states that ”it is in terms of their indirect effects on the global digital sector that AI systems will have a major impact on the environment”. In the same spirit, (Walsh et al.,, 2020) warns that ”optimising actions for a restricted set of parameters (profit, job security, etc) without
+consideration of these wider impacts can lead to consequences for others, including one’s future self as well as future generations”.
+
+
+Evaluating the impacts of an AI service is not fundamentally different from doing it for another digital service. However, AI presents specificities, that must be taken into account because they increase its environmental impacts.
+
+
+First, AI - and in particular deep learning - methods usually require large quantities of data. These data have to be acquired, transferred, stored and processed. All these steps require equipment and energy, and have environmental impacts. In the case of a surveillance satellite, the data will probably be in large quantities, but the number of acquisition devices may be limited; in the case of a smart building infrastructure, the data may be in smaller quantities, but many devices will be required.
+
+
+Training deep neural models also takes a lot of computation time and resources, partly because the model itself learns a comprehensive representation that enables it to better analyze the data. Whereas with other models, a human will provide part of this information, often in the form of a handcrafted solution. The computation cost can be even higher if the model does continuous learning.
+
+
+At the same time, AI’s popularity is increasing and AI is often presented as a solution to environmental problems with AI for Green proposals
+ (Rolnick et al.,, 2019; Vinuesa et al.,, 2020; Gailhofer et al.,, 2021). The negative environmental impacts can be briefly evoked - and in particular rebound effects (Rolnick et al.,, 2019; Wu-2021) where unitary efficiency gains can lead to global GHG increase - but no quantification of all AI’s environmental costs is proposed to close the loop between AI for Green and Green AI. That is why it is even more important to be able to assess the actual impacts, taking into account both positive and negative effects.
+
+
+Incidentally those works often use the term AI to actually refer to deep learning methods, even though AI has a much wider scope with at least two major historical trends (Cardon et al.,, 2018). In this paper, we will also focus on deep learning methods, which pose specific environmental issues, and as we have seen, are often presented as possible solutions to environmental problems.
+We describe these impacts and discuss how to take them into account.
+
+
+Our contributions are the following:
+
+
+•
+
+We review the existing work to assess the environmental impacts of AI and show their limitations (Sections  2.1 and 2.2).
+
+
+
+•
+
+We present life cycle assessment (Section 2.3) and examine how it can comprehensively evaluate the direct environmental impacts of an AI service (Section 3).
+
+
+
+•
+
+We discuss how to assess the environmental value of an AI service designed for environmental purposes (Section  4).
+
+
+
+•
+
+We argue that although improving the state of the art, the proposed methodology can only show the technical potential of a service, which may not fully realize in a real-life context (Section 5).
+
+
+
+
+
+
+
+
+2. Related work
+
+This section reviews existing tools for evaluating environmental impacts of AI as well as green applications of AI. It ends with an introduction to life cycle assessment, a well-founded methodology for environmental impact assessment but still not used for AI services.
+
+
+
+2.1. Carbon footprint of AI
+
+Strubell et al. (Strubell et al.,, 2019) has received much attention because it revealed a dramatic impact of NLP algorithms in the training phase: the authors found GHG emissions to be equivalent to 300 flights between New York and San Francisco. Premises of such an approach were already present in (Li et al.,, 2016) for CNN with less meaningful metrics (energy per image or power with no indications on the global duration).
+
+
+In (Schwartz et al.,, 2020) the authors observe a more general exponential evolution in deep learning architecture parameters. Therefore they promote ”Green AI” to consider energy efficiency at the same level as accuracy in training models, and recommend in particular to report floating-point operations. Other authors (García-Martín et al.,, 2019) have also reviewed all the methods to estimate energy consumption from computer architecture. They distinguish between different levels of description, software/hardware level, instruction/application level and they consider how those methods can be applied to monitor training and inference phases in machine learning.
+
+
+In the continuity of (Strubell et al.,, 2019) and (Schwartz et al.,, 2020), several tools have been proposed to make the impacts of training models more visible. They can be schematically divided into
+
+
+•
+
+Integrated tools, such as Experiment Impact Tracker 111https://github.com/Breakend/experiment-impact-tracker (Henderson et al.,, 2020), Carbon Tracker 222https://github.com/lfwa/carbontracker (Anthony et al.,, 2020) and CodeCarbon 333https://codecarbon.io/, which are all Python packages reporting measured energy consumption and the associated carbon footprint.
+
+
+
+•
+
+Online tools, such as Green Algorithms 444http://www.green-algorithms.org/ (Lannelongue et al.,, 2020) and ML CO2 impact 555https://mlco2.github.io/impact/#compute (Lacoste et al.,, 2019), which require only a few parameters, such as the training duration, the material, the location but are less accurate.
+
+
+
+
+
+AI literature mostly addresses a small part of direct impacts and neglects production and end of life, thus not following recommendations such as (ITU-T,, 2014). In (Gupta et al.,, 2020; Wu-2021) the authors point out the methodological gaps of the previous studies focusing on the use phase. In particular, manufacturing would account for about 75%percent7575\% of the total emissions of Apple or of an iPhone 5, just to give examples of various scales. Their study is based on a life cycle methodology, relying on sustainability reports with the GHG protocol standard. (Ligozat and Luccioni,, 2021) provides a list of the carbon emission sources of an AI service, which gives a more comprehensive view of the direct impacts in terms of carbon footprint only. (kaack:hal-03368037) also advocates the need for taking indirect impacts (e.g., behavioral or societal changes due to AI) into account when evaluating AI services.
+
+
+Some works focus on optimizing the AI processes regarding runtime, energy consumption, or carbon footprint. For example, in (Patterson et al.,, 2021) the authors update the results from (Strubell et al.,, 2019) and reveal a considerable reduction of the GHG impact - by a factor of 100 - if one considers the location of the data center used for training (low-carbon energy) and the architecture of the deep network (sparsity). Nevertheless as they recognize, their study evaluates the GHG emissions of operating computers and data centers only and limits the perimeter by excluding the production and the end-of-life phases of the life cycle. Their work also considers a highly optimized use case, which may not be representative of real case scenarios. The energy efficiency of machine learning has also been the subject of dedicated workshops 666Workshop on Energy Efficient Machine Learning and Cognitive Computing, https://www.emc2-ai.org/virtual-21.
+
+
+
+
+2.2. AI for Green benefits
+
+When designing an AI for Green method i.e., a method using AI to reduce energy consumption or to benefit other environmental indicators, complete AI’s impacts should also be considered to build meaningful costs/benefits assessments. (Bommasani et al.,, 2021) proposes a framework for such cost-benefit analysis of AI foundation models to evaluate environmental
+and societal trade-offs. We discuss this framework in Section 4.
+Most AI solutions for the environment lack a rigorous evaluation of the cost/benefit balance, and one of our contributions is to advance this issue.
+
+
+
+
+2.3. Life cycle assessment
+
+LCA is a widely recognized methodology for environmental impact assessment, with ISO standards (ISO 14040 and 14044) and a specific methodology standard for ICT from ETSI/ITU (ITU-T,, 2014).
+It quantifies multiple environmental criteria and covers the different life cycle phases of a target system.
+(Hauschild et al.,, 2018) clearly states that ”to avoid the often seen problem shifting where solutions to a problem creates several new and often ignored problems, these decisions must take a systems perspective. They must consider […] the life cycle of the solution, and they need to consider all the relevant impacts caused by the solution.”
+The LCA theoretical approach exposed in (Heijungs and Suh,, 2002) describes the system of interest as a collection of building blocks called unit processes, for example ”Use phase of the server” on which the model is trained.
+The set of all unit processes is called the technosphere, as opposed to the ecosphere. Each unit process can be expressed in terms of flows of two kinds:
+
+
+•
+
+Economic flows are the directed links between the unit processes or said differently exchanges inside the technosphere.
+
+
+
+•
+
+Ecnvironmental flows are the links from the biosphere to the technosphere or vice versa.
+
+
+
+The detailed description of such a system is called the life cycle inventory (LCI) 777We include the complete LCI of a generic AI service in the supplementary material to the paper. and it can be formulated in terms of linear algebra. The goal of a life cycle assessment consists in computing the sum of the environmental flows of the system associated with a functional unit. To be concrete, if one considers a heating system in a smart building, the functional unit could be ”heating 1m2 to 20∘C for one year”.
+
+
+Of course, very often, the LCI does not correspond exactly to the functional unit. The size of economic flows may not match (e.g., the functional unit may partially use shared servers and sensors), and a process may be multifunctional , i.e., producing flows of different types at the same time (e.g., storage capacity and computational power). Both these problems can be solved using for instance allocation methods according to a key. A typical allocation key for network infrastructures would be the volume of data. For a data center it could be the economic value of storage and computational services when they cannot be physically isolated.
+
+
+Even though LCA is widely used in many domains, it has rarely been applied to AI services.
+
+
+
+
+
+
+3. Life cycle assessment of an AI solution
+
+When it comes to quantifying the impacts of digital technologies and in particular AI technologies, one faces several methodological choices that deserve a specific definition of the studied system. For instance, assessing the global impacts of the AI domain - if we could circumscribe it precisely - is not the same as assessing the impacts of an AI algorithm or service.
+The emerging field of AI’s impacts quantification still suffers from a lack of common methodology, and in particular it very often focuses only on the Use phase of devices involved in an AI service. To perform meaningful quantification, we strongly suggest following the general framework of life cycle assessment (LCA, detailed in 3.2). We will show how it can be adapted to an AI service i.e., in this case a deep learning code used either alone or in a larger application.
+
+
+AI being part of the Information and Communication Technology (ICT) sector, and following the taxonomies from (Hilty and Hercheui,, 2010; Horner et al.,, 2016), its impacts can be divided into first-, second- and third-order impacts. In this section we focus only on first-order impacts while we will discuss second and third orders in Sections 4 and 5.
+
+
+We will use the term AI service for all the equipment (sensors, servers…) used by the AI, and the term AI solution for the complete application using AI. In the case of the smart building, the AI solution is the smart building itself, while the AI service is the digital equipment needed for the smart infrastructure.
+
+
+
+3.1. First-order impacts of an AI service
+
+First-order - or direct - impacts of the AI service are the impacts due to the different life cycle phases of the equipment:
+
+
+•
+
+Raw material extraction, which encompasses all the industrial processes involved in the transformation from ore to metals;
+
+
+
+•
+
+Manufacturing, which includes the processes that create the equipment from the raw material;
+
+
+
+•
+
+Transport, which includes all transport processes involved, including product distribution;
+
+
+
+•
+
+Use, which includes mostly the energy consumption of equipment while it is being used;
+
+
+
+•
+
+and End of life, which refers to the processes to dismantle, recycle and/or dispose of the equipment.
+
+
+
+For simplicity reasons, we will merge the first three items into a single production phase in the rest of the paper.
+
+
+For example an AI solution in a smart building may need sensors and servers that require resources and energy for their production, operation and end of life.
+
+
+Figure 1. LCA dimensions: the first dimension corresponds to the phases of life cycle, the second one to the environmental impacts (see 3 for more details on this last dimension). 
+
+
+A second dimension is necessary to assess the impacts, a set of environmental criteria considered. Indeed each life cycle phase has impacts on different environmental indicators: Greenhouse Gases emissions (usually expressed as Global Warming Potential, GWP), water footprint, human toxicity, or abiotic resource depletion (ADP) for instance.
+In general, evaluating the environmental impact of a service requires multiple impacts criteria (ITU-T,, 2014). ISO states that ”the selection of impact categories shall reflect a comprehensive set of environmental issues related to the product system being studied, taking the goal and scope into consideration”. Additionally, ”the selection of impact categories, indicators and models shall be consistent with the goal and scope of the LCA study”. Hence,
+the costs must take into account at least the criteria that are supposed to be tackled by the AI solution in the case of AI for Green: if the AI solution is applied to reduce energy consumption for example, the main expected gain will probably be in terms of carbon footprint, so at least the carbon footprint of using the model should be considered. For an application monitoring biodiversity, the most relevant criterion may be natural biotic resources (and not carbon footprint), which include wild animals, plants etc.
+
+
+Figure 1 sums ups these two dimensions. As it has been previously stated, in the literature, only part of the global warming potential due to the use phase has generally been considered when evaluating AI, which corresponds to the shaded area in the figure.
+
+
+
+
+3.2. Life cycle assessment methodology for AI
+
+In this section, we focus on life cycle assessment of the AI solution, and the associated ICT equipment. We aim at proposing a methodology for applying the general framework of LCA to AI services. For LCA of all other processes, we refer to LCA standards and (Hauschild et al.,, 2018) for example.
+In order to concretely apply the methodology presented for an AI service, we use the ITU recommendation (ITU-T,, 2014) for environmental evaluation of ICT.
+
+
+Figure 2 shows two sides of the Life cycle of an AI service. The top part of this figure shows the different tasks involved in an AI service, from a software point of view (data acquisition, …, inference). For each task, one or several devices is used. The bottom part of the figure shows the life cycle phases of each of these devices, from a hardware point of view. The environmental impacts of the AI service will stem from the life cycle phases of the devices. Note that all devices involved in the AI tasks should be taken into account.
+
+
+Remark on terminology: In the paper, the term ”Use phase” refers to the use phase of the life cycle of equipment, corresponding to the devices provided for the AI service (box ”Use of device” of the lower part in Figure 2). We call ”Application phase” the inference phase of the AI service (green box of the upper part in Figure 2).
+
+
+
+
+AI serviceAI enhanced application(electric vehicle, smart building…)Data acquisitionData production
+
+
+Learning
+
+
+
+Inference
+
+
+
+Data storage
+device1(sensors…)device2(computer…)device3(supercomputer…)device4(mobile…)device5(hard drive…)
+(a) Different tasks involved in an AI service
+
+
+
+
+
+AI serviceAI enhanced application(electric vehicle, smart building…)Productionof d​e​v​i​c​ei𝑑𝑒𝑣𝑖𝑐subscript𝑒𝑖device_{i}Useof d​e​v​i​c​ei𝑑𝑒𝑣𝑖𝑐subscript𝑒𝑖device_{i}End of lifeof d​e​v​i​c​ei𝑑𝑒𝑣𝑖𝑐subscript𝑒𝑖device_{i}
+
+
+Production
+of electricity
+Resources (metals, etc.)Emissions (pollution, abiotic resources depletion…)
+(b) Life cycle phases of each d​e​v​i​c​ei𝑑𝑒𝑣𝑖𝑐subscript𝑒𝑖device_{i} used by the service
+
+
+
+Figure 2. Diagram representing the Life Cycle Inventory of an AI service:
+Above: an AI for green application corresponds to the inference step that depends on other unit processes that require various devices. Below: the use of devices is located in a more global environment, including production of resources and impacts. In both schemes colored boxes correspond to unit processes, black arrows correspond to economic flows (bold: material, dashed: energy) and red arrows to environmental flows.
+
+
+
+Concerning the system boundaries, we refer to (ADEME,, 2021) to consider the equipment for three tiers:
+
+
+•
+
+terminals. In the case of the smart building, this can include: user terminals used to develop, train and use the AI service; terminals in the facility where the AI service is trained dedicated to IT support; smart thermostats.
+
+
+
+•
+
+network. For the smart building case, network equipment used for training the AI model in the facility, and network equipment in the buildings where the thermostats are used.
+
+
+
+•
+
+data center/server. For the smart building case, servers on which the model is trained and used; training and inference can be done on the same server or not.
+
+
+
+For each tier, all support equipment and activities may also be considered. For example the power supply unit and HVAC of the data center should be taken into account.
+
+
+The life cycle stages to consider are the ones previously mentioned: production, use and end of life.
+In particular, (ITU-T,, 2014) and (ADEME,, 2021) give classifications of unit processes according to the life cycle stages, which can be applied to AI services, as shown in Table 1.
+
+
+Table 1. Application to AI services of ITU recommendation (ITU-T,, 2014) regarding the evaluation of life cycle stages/unit processes 
+
+
+
+
+
+Life cycle id
+
+
+
+
+Life cycle stage and unit processes
+
+
+
+
+Recommendation
+
+
+
+
+A - Raw material acquisition
+
+
+Mandatory
+
+
+
+
+B - Production
+
+
+
+
+
+Devices production and assembly
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+Manufacturer support activities
+
+
+
+
+Recommended
+
+
+
+
+
+
+
+Production of support equipment
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+ICT-specific site construction
+
+
+
+
+Recommended
+
+
+
+
+C - Use
+
+
+
+
+
+Use of ICT equipment
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+Use of support equipment
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+Operator support activities
+
+
+
+
+Recommended
+
+
+
+
+
+
+
+Service provider support activities
+
+
+
+
+Recommended
+
+
+
+
+D - End of life
+
+
+
+
+
+Preparation of ICT goods for reuse
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+Storage / disassembly / dismantling / crushing
+
+
+
+
+Mandatory
+
+
+
+
+
+
+
+If applied to our smart building use case, the unit processes that must be taken into account would be:
+
+
+•
+
+For equipment that is dedicated to the application, such as the smart thermostats: Production, Use and End of life.
+
+
+
+•
+
+For the servers on which the AI service is trained and used and their environment (network devices, storage servers, backup servers, user terminal, HVAC… and other potential equipment not dedicated to the application):
+
+
+–
+
+Production and End of life with an allocation of the impacts, with respect to the execution time for instance.
+
+
+
+–
+
+Part of the use phase corresponding to the dynamic energy consumption i.e., raise of consumption due to the execution of the program.
+
+
+
+–
+
+Part of the use phase corresponding to the static consumption, with an allocation (for example if n𝑛n programs are run simultaneously, 1/n1𝑛1/n of this consumption) ”since equipment is switched on in part to address the computing needs of the (Machine Learning) model” (Ligozat and Luccioni,, 2021).
+
+
+
+
+
+
+
+
+The production phase is generally important for ICT equipment in terms of global warming potential at least. Yet, when trying to assess this phase for deep learning methods, we are faced with a lack of LCAs for Graphical Processing Unit (GPUs) (or Tensor Processing Unit (TPUs) or equivalents). (Berthoud et al.,, 2020) yet showed that for a CPU-only data center in France, around 40% of the GHG emissions of the equipment were due to the production phase.
+
+
+The use phase is mostly due to the energy use, so the impacts of this part are highly dependent on the server/facility efficiency and the carbon intensity of the energy sources.
+
+
+The end-of-life phase is difficult to assess in ICT in general because of lack of data concerning this phase of equipment. In particular, the end of life of many ICT equipment is poorly documented: globally, about 80% of electronic and electrical equipment is not formally collected (Baldé et al.,, 2017). 
+
+
+
+
+
+
+
+4. Assessing the usefulness of an AI for Green service
+
+Now that we have presented how the general framework of life cycle assessment can be adapted to AI solutions, we propose to use it for evaluating the complete benefits of an AI for Green service.
+
+
+In this section, we will consider the following setting:
+
+
+•
+
+A reference application M1subscript𝑀1M_{1} which corresponds to the application without AI. If the application is a smart building for example, M1subscript𝑀1M_{1} will be the building without smart capabilities.
+
+
+
+•
+
+An AI-enhanced application M2subscript𝑀2M_{2} which corresponds to the application with an AI service that is supposed to have a positive impact on the environment. In the previous case, it would be the smart building.
+
+
+
+
+
+
+4.1. Theoretical aspects
+
+When proposing an AI for Green method, one should ensure that the overall environmental impact is positive: the positive gain induced by using the AI solution should be higher than the negative impacts associated to the solution.
+
+
+This requires to assess first-, second- and third-order impacts of AI (Hilty and Hercheui,, 2010; Horner et al.,, 2016), as illustrated in Figure 3. As we detailed in the previous section, first-order impacts come from the life cycle phases of all the equipment necessary to develop and deploy the AI service.
+
+
+Second-order impacts correspond to the impacts due to the application of AI. AI can optimize or substitute existing systems: energy consumption in a building can be optimized using occupancy or behavior detection, energy profiling, etc.
+
+
+Third-order impacts are all changes in technology or society due to the introduction of AI solutions, possibly encompassing effects of very different scales, from individual behavioral responses to systemic and societal transformations, and from short-term to long-term effects. Rebounds effects fall into this category: an increase in efficiency does not necessarily translate into a reduction of impacts of the same magnitude, and it can even lead to an increase in these impact (Berkhout et al.,, 2000). Rebound effects occur because potential savings (in terms of money, time, resources, etc.) are transformed into more consumption (Schneider et al.,, 2001). For example, due to economical savings, smart building users may decide to increase heating temperature for better comfort or to buy more flight tickets after an increase in energy efficiency.
+
+
+Figure 3. Overview of AI’s impacts. First-order or direct impacts result from the equipment life cycle. Second-order impacts are the difference between the LCAs of the reference system and the AI-enhanced system. Third-order impacts are changes in technology or society induced by the application.
+
+
+Third-order impacts are beyond the scope of the methodology proposed here, and are briefly discussed in Section 5.
+According to (ITU-T,, 2014), first and second-order impacts of the AI service should be estimated based on life cycle assessment (LCA), the difference between the two being the scope: for first-order impacts the scope is restricted to the equipment involved in the target AI service (for example the AI involved in a smart building), while second-order impacts consider the whole solution (the smart building itself).
+Including second-order impacts requires to extend the scope to the whole application AI is supposed to enhance. More specifically the net environmental impacts considering both first and second-order effects are obtained by computing:
+
+
+(1)
+
+Δ​(M2|M1)=L​C​A​(M2)−L​C​A​(M1)∈ℝdΔconditionalsubscript𝑀2subscript𝑀1𝐿𝐶𝐴subscript𝑀2𝐿𝐶𝐴subscript𝑀1superscriptℝ𝑑\Delta(M_{2}|M_{1})=LCA(M_{2})-LCA(M_{1})\in\mathbb{R}^{d}
+
+
+
+with:
+
+
+•
+
+M1subscript𝑀1M_{1} the reference application without using the AI service,
+
+
+
+•
+
+M2subscript𝑀2M_{2} the application enhanced by AI,
+
+
+
+•
+
+L​C​A​(x)𝐿𝐶𝐴𝑥LCA(x) a quantification of d𝑑d types of environmental impacts (e.g., GHG emissions, water footprint, etc.). LCA methodology is described in 3.2. Note that L​C​A​(M2)𝐿𝐶𝐴subscript𝑀2LCA(M_{2}) includes the impacts of the AI service itself, i.e., L​C​AA​I​(M2)𝐿𝐶subscript𝐴𝐴𝐼subscript𝑀2LCA_{AI}(M_{2}).
+
+
+
+
+
+A previous work 
+(Bommasani et al.,, 2021) also gave a simplified scheme for assessing the cost-benefit of deploying a foundation model, which also includes social benefits and costs, but does not explicit the direct environmental costs of using this model. We propose to relate our methodology (Equation (1)) to their proposal.
+Adopting their equation, but focusing on the environmental impacts only,
+the overall value of a model can be assessed with:
+
+
+
+(2)
+
+V​(M)=S​(M)−E​(M)−O​(M)𝑉𝑀𝑆𝑀𝐸𝑀𝑂𝑀V(M)=S(M)-E(M)-O(M)
+
+
+
+with:
+
+
+
+•
+
+V​(M)𝑉𝑀V(M) the value of using the model i.e., the environmental gain induced by its use in the practical application considered
+
+
+
+•
+
+S​(M)𝑆𝑀S(M) the environmental benefit that can be interpreted as the difference between the initial impact of the application and its final impact (not taking into account the AI solution i.e., the Learning and Inference task in the top part of Figure 2)
+
+
+
+•
+
+E​(M)𝐸𝑀E(M) the energy cost of the model
+
+
+
+•
+
+O​(M)𝑂𝑀O(M) all other impacts including chip production, waste, risks for biodiversity, and third-order impacts (which are not discussed here).
+
+
+
+Regarding the well-established framework of LCA, this approach suffers from several weaknesses. First, in the equation all the values are expressed in dollars. This formally allows to perform addition of several kinds of impacts but with an arbitrary consideration to the diversity of environmental issues. By definition, LCA considers multiple criteria for the impacts, previously described at the beginning of Section 3 (GHG emissions, water footprint…). LCA may aggregate several impacts but with specific weights not necessarily dependent on an economic value. As noted in (Hauschild et al.,, 2018) ”there is no scientific basis on which to reduce the
+results of an LCA to a single result or score because of the underlying ethical
+value-choices”.
+
+
+Besides, if one considers for instance the case of an AI service dedicated to biodiversity (see for instance 8.1 in (Rolnick et al.,, 2019)), one would expect to precisely quantify the positive impact of this service on biodiversity (schematically, how many species can be saved?) balanced by the negative ones (producing chips for GPUs has an impact on the biodiversity through several sources of pollution (Villard et al.,, 2015)). Adopting Equation (2) will mix several impacts together and may dilute the value of interest (e.g., biodiversity), that could be burdened by negative impacts regarding energy to train the models, for instance.
+
+
+Last, even if the equation is not wrong per se, the expression in terms of benefit/costs is questionable, and practical means for its computation are missing in (Bommasani et al.,, 2021).
+
+
+We thus believe that Equation (1) should be used.
+Terms of Equation (2) can be related to the methodology proposed in our paper as follows:
+
+
+(3)
+
+V​(M2)⏟−Δ​(M2|M1)≈S​(M2|M1)​−E​(M2)−O​(M2)⏟L​C​AA​I​(M2)subscript⏟𝑉subscript𝑀2Δconditionalsubscript𝑀2subscript𝑀1𝑆conditionalsubscript𝑀2subscript𝑀1subscript⏟𝐸subscript𝑀2𝑂subscript𝑀2𝐿𝐶subscript𝐴𝐴𝐼subscript𝑀2\underbrace{V(M_{2})}_{-\Delta(M_{2}|M_{1})}\approx S(M_{2}|M_{1})\underbrace{-E(M_{2})-O(M_{2})}_{LCA_{AI}(M_{2})}
+
+
+
+where Δ​(M2|M1)Δconditionalsubscript𝑀2subscript𝑀1\Delta(M_{2}|M_{1}) and L​C​AA​I​(M2)𝐿𝐶subscript𝐴𝐴𝐼subscript𝑀2LCA_{AI}(M_{2}) are defined in Equation (1). The negative impacts of an AI solution M2subscript𝑀2M_{2} compared to the reference solution M1subscript𝑀1M_{1} are not always restricted to its AI part (i.e., to E​(M2)𝐸subscript𝑀2E(M_{2}) and O​(M2)𝑂subscript𝑀2O(M_{2})). For example, compared to a standard vehicle the negative impacts of an autonomous vehicle are not only due to the life cycle of (additional) ICT equipment, but also to additional aerodynamic drag due to the presence of LIDAR on the roof (Taiebat et al.,, 2018). Hence, the nature of the impacts in S​(M2|M1)𝑆conditionalsubscript𝑀2subscript𝑀1S(M_{2}|M_{1}) (positive or negative) cannot be stated a priori and depends on complete LCA results for both applications M2subscript𝑀2M_{2} and M1subscript𝑀1M_{1}. It may also depend on the target environmental criteria.
+
+
+
+
+4.2. Case studies
+
+In order to review the kind of evaluation that is usually made in the AI for Green literature, we analyzed the references for several domains of (Rolnick et al.,, 2019), which identifies potential applications of machine learning for climate change adaptation of mitigation 888This review was documented in a csv file, which is given as supplementary material to the paper..
+
+
+We mostly chose domains that had been flagged as having a High Leverage and noted for each paper cited in the corresponding section the kind of environmental evaluation, with the following categories:
+
+
+(a)
+
+No mention of the environmental gain.
+
+
+
+(b)
+
+General mention of the environmental gain.
+
+
+
+(c)
+
+A few words about the environmental gain but no quantitative evaluation or only indirect estimation.
+
+
+
+(d)
+
+Evaluation of the energy gain without taking the AI service into account.
+
+
+
+(e)
+
+Evaluation of the energy gain taking the use phase of the AI service into account.
+
+
+
+(f)
+
+Comprehensive evaluation of the environmental gain (comparison of LCAs).
+
+
+
+
+
+The results of the review are shown in Figure 4.
+
+
+Figure 4. Sankey diagram of parts of Rolnick’s paper references in terms of environmental evaluation (created with the Sankey Diagram Generator by Dénes Csala, based on the Sankey plugin for D3 by Mike Bostock; https://sankey.csaladen.es; 2014)
+
+
+The central node is ”Rolnick et al. citations”. On its left are the domains of the citations. For example, the Smart building section contained 15 relevant citations.
+
+
+On its right the first flows show the partition into general machine learning applications (ML), deep learning applications (DL), and other methods (other). For example, 20 papers corresponded to deep learning applications.
+
+
+The last flows on the right show the kinds of environmental evaluation. We can note that about half of the papers do not include any environmental evaluation, although the focus is on applications to tackle climate change. Many papers also give a distant proxy for evaluation, such as detailing the possible impacts without quantification, or indicating the execution time of the program.
+
+
+A few citations evaluate the environmental gain, mostly in terms of energy gain, but none of the papers considered took into account the AI service impacts.
+
+
+It can be noted that other papers that include an evaluation of part of these impacts, can be found in the literature.
+(Bracquené et al.,, 2020) for example present an intelligent control systems that takes into account the expected occupancy in order to adapt the thermostat and save energy. They do not take into account learning the occupancy model, but take into account the LCA of the smart thermostats, and show that the energy needed for these devices across their whole life cycle will almost always be lower that the energy saved.
+
+
+
+
+
+
+5. Discussion
+
+In this paper, we have analyzed the environmental impacts of AI solutions, in particular in the case of AI for Green applications, and proposed a framework to evaluate them more completely. The proposed methodology compares, through life cycle assessment, the impact of a reference solution with the AI one (1) for the appropriate types of environmental impacts. The analysis of literature on AI solutions has made salient the following issues/problems.
+
+
+
+5.1. Current environmental evaluation of AI services is under-estimated
+
+We have shown that AI for Green papers only take into account a small part of the direct environmental impacts.
+
+
+Several reasons can explain this under-estimation. The narratives about dematerialization that would correspond to a dramatic decrease in environmental impacts, permeate AI as a part of ICT (Bol et al.,, 2021). However, these narratives have proven to be false until now. Attention to AI’s GHG emissions has focused on electricity consumption (energy flows). At the moment, material flows receive less attention in AI. However, it is beginning to be considered (Gupta et al.,, 2020; Wu-2021).
+
+
+
+
+5.2. AI research should use Life Cycle Assessment to assess the usefulness of an AI service
+
+Life cycle assessment is a solid methodology to evaluate not only global warming potential but also other direct environmental impacts. LCA considers all the steps from production to use and end of life. However, it has several well-known limitations due to the complexity of processes involved in material production. Obtaining all the information to assign reliable values to each edge of the life cycle inventory also proves difficult, e.g., there is very little information on manufacturing impacts of GPU either from manufacturers or in LCA databases. To solve this problem, we could encourage the AI community to lobby companies to open a part of their data. This approach would be in the same spirit as what is happening for open science but would also require taking legal issues into account.
+
+
+
+
+5.3. AI for Green gains are only potential
+
+Even when a properly conducted LCA concludes that an AI solution is environmentally beneficial, such a result should be considered with caution. Environmental benefits computed by the LCA-based methodology proposed in this paper correspond to a technical and simplistic view of environmental problems: it assumes that AI will enhance or replace existing applications, all other things being equal. The ambition to solve societal problems using AI is praiseworthy, but it should probably be accompanied by socio-technical concerns and an evaluation of possible third-order effects. For example, autonomous vehicles are often associated with potential efficiency gains (such as helping car sharing, or allowing platooning) and corresponding environmental benefits (Taiebat et al.,, 2018). However, autonomy could also profoundly transform mobility in a non-ecological way (Coroamă and Pargman,, 2020).
+
+
+
+
+5.4. AI services and large deployment
+
+Evaluating third-order effects is even more critical when large-scale deployment of the proposed solution(s) is projected, e.g., to maximize absolute gains. This case requires special attention even in LCA, since large-scale deployment may induce societal reorganizations for producing and operating the solution(s). For example, the generalization of AI may lead to a substantial increase in demand for specific materials (such as lithium or cobalt) or energy. This increase may have non-linear environmental consequences, e.g., opening new and less performing mines, increasing the use of fossil fuel based power plants, etc. Hence in this case, the attributional LCA framework we suggest using in this paper needs to be replaced by the much more complex consequential one (Hauschild et al.,, 2018).

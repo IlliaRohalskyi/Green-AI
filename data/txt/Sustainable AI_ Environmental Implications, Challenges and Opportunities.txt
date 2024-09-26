@@ -1,0 +1,518 @@
+Abstract:
+
+Abstract
+This paper explores the environmental impact of the super-linear growth trends for AI from a holistic perspective, spanning Data, Algorithms, and System Hardware.
+We characterize the carbon footprint of AI computing by examining the model development cycle across industry-scale machine learning use cases and, at the same time, considering the life cycle of system hardware.
+Taking a step further, we capture the operational and manufacturing carbon footprint of AI computing and present an end-to-end analysis for what and how hardware-software design and at-scale optimization can help reduce the overall carbon footprint of AI.
+Based on the industry experience and lessons learned, we share the key challenges and chart out important development directions across the many dimensions of AI.
+We hope the key messages and insights presented in this paper can inspire the community to advance the field of AI in an environmentally-responsible manner.
+
+
+
+
+I Introduction
+
+
+Artificial Intelligence (AI) is one of the fastest growing domains spanning research and product development and significant investment in AI is taking place across nearly every industry, policy, and academic research. This investment in AI has also stimulated novel applications in domains such as science, medicine, finance, and education. Figure 1 analyzes the number of papers published within the scientific disciplines, illustrating the growth trend in recent years111Based on monthly counts, Figure 1 estimates the cumulative number of papers published per category on the arXiv database..
+
+
+AI plays an instrumental role to push the boundaries of knowledge and sparks novel, more efficient approaches to conventional tasks.
+AI is applied to predict protein structures radically better than previous methods. It has the potential to revolutionize biological sciences by providing in-silico methods for tasks only possible in a physical laboratory setting [1].
+AI is demonstrated to achieve human-level conversation tasks, such as the Blender Bot [2], and play games at superhuman levels, such as AlphaZero [3].
+AI is used to discover new electrocatalysts for efficient and scalable ways to store and utilize renewable energy [4], predicting renewable energy availability in advance to improve energy utilization [5],
+operating hyperscale data centers efficiently [6],
+growing plants using less natural resources [7], and, at the same time,
+being used to tackle climate changes [8, 9].
+It is projected that, in the next five years, the market for AI will increase by 10×\times into hundreds of billions of dollars [10].
+All of these investments in research, development, and deployment have led to a super-linear growth in AI data, models, and infrastructure capacity.
+With the dramatic growth of AI, it is imperative to understand the environmental implications, challenges, and opportunities of this nascent technology. This is because technologies tend to create a self-accelerating growth cycle, putting new demands on the environment.
+
+
+Figure 1: The growth of ML is exceeding that of many other scientific disciplines. Significant research growth in machine learning is observed in recent years as illustrated by the increasing cumulative number of papers published in machine learning with respect to other scientific disciplines based on the monthly count
+(y-axis measures the cumulative number of articles on arXiv).
+
+
+
+This work explores the environmental impact of AI from a holistic perspective.
+More specifically, we present the challenges and opportunities to designing sustainable AI computing across the key phases of the machine learning (ML) development process — Data, Experimentation, Training, and Inference — for a variety of AI use cases at Facebook, such as vision, language, speech, recommendation and ranking. The solution space spans across our fleet of datacenters and on-device computing.
+Given particular use cases, we consider the impact of AI data, algorithms, and system hardware.
+Finally, we consider emissions across the life cycle of hardware systems, from manufacturing to operational use.
+
+
+Figure 2: Deep learning has witnessed an exponential growth in data, model parameters, and system resources over the recent years.
+(a) The 1000×1000\times model size growth has led to higher model accuracy for various ML tasks. For example, with GPT-3, to increase the model quality BLEU score from 5 to 40 requires a model 1,000×1,000\times larger in size.
+(b) At Facebook, the amount of data for recommendation use cases has roughly doubled between 2019 and 2021, leading to 3.2 times increase in the data ingestion bandwidth demand.
+(c) Facebook’s recommendation and ranking model sizes have increased by 20 times during the same time period [11].
+(d) The explosive growth in AI has driven 2.9×2.9\times and 2.5×2.5\times capacity increases for AI training and inference, respectively.
+
+
+
+AI Data Growth.
+In the past decade, we have seen an exponential increase in AI training data and model capacity.
+Figure 2(b) illustrates that the amount of training data at Facebook for two recommendation use cases — one of the fastest growing areas of ML usage at Facebook— has increased by 2.4×\times and 1.9×\times in the last two years, reaching exabyte scale.
+The increase in data size has led to a 3.2×\times increase in data ingestion bandwidth demand.
+Given this increase, data storage and the ingestion pipeline accounts for a significant portion of the infrastructure and power capacity compared to ML training and end-to-end machine learning life cycles.
+
+
+AI Model Growth.
+The ever-increasing data volume has also driven a super-linear trend in model size growth.
+Figure 2(a) depicts the 1000×1000\times model size increase for GPT3-based language translation tasks [12, 13], whereas for Baidu’s search engine, the model of 1000×1000\times larger in size improves accuracy in AUC by 0.030. Despite small, the accuracy improvement can lead to significantly higher-quality search outcomes [14].
+Similarly, Figure 2(c) illustrates that between 2019 and 2021, the size of recommendation models at Facebook has increased by 20×\times [15, 16, 17, 11].
+Despite the large increase in model sizes, the memory capacity of GPU-based AI accelerators, e.g. 32GB (NVIDIA V100, 2018) to 80GB (NVIDIA A100, 2021), has increased by <2×<2\times every 2 years.
+The resource requirements for strong AI scaling clearly outpaces that of system hardware.
+
+
+AI Infrastructure Growth.
+The strong performance scaling demand for ML motivates a variety of scale-out solutions [11, 18] by leveraging parallelism at scale with a massive collection of training accelerators.
+Figure 2(d) illustrates that the explosive growth in AI use cases at Facebook has driven 2.9×2.9\times increase in AI training infrastructure capacity over the 1.5 years.
+In addition, we observe trillions of inference per day across Facebook’s data centers—more than doubling in the past 3 years.
+The increase in inference demands has also led to an 2.5×2.5\times increase in AI inference infrastructure capacity.
+Last but not least, the carbon footprint of AI goes beyond its operational energy consumption.
+The embodied carbon footprint of systems is becoming a dominating factor for AI’s overall environmental impact (Section III) [19].
+
+
+The Elephant in the Room.
+Despite the positive societal benefits [20], the endless pursuit of achieving higher model quality has led to the exponential scaling of AI with significant energy and environmental footprint implications.
+Although recent work shows the carbon footprint of training one large ML model, such as Meena [21], is equivalent to 242,231 miles driven by an average passenger vehicle [22], this is only one aspect; to fully understand the real environmental impact
+we must consider the AI ecosystem holistically going forward — beyond looking at model training alone and by accounting for both operational and embodied carbon footprint of AI.
+We must look at the ML pipeline end-to-end: data collection, model exploration and experimentation, model training, model optimization and run-time inference.
+The frequency of training and scale of each stage of the ML development cycle matter.
+From the systems perspective, the life cycle of ML software and system hardware, including manufacturing and operational use, must also be considered.
+
+
+Figure 3: Model Development Phases over AI System Hardware Life Cycle: (a) At Facebook, we observe a rough power capacity breakdown of 10:20:70 for AI infrastructures devoted to the three key phases — Experimentation, Training, and Inference; (b) Considering the primary stages of the ML pipeline end-to-end, the energy footprint of RM1 is roughly 31:29:40 over Data, Experimentation/Training, and Inference;
+(c) Despite the investment to neutralize the operational footprint with carbon-free energy, the overall data center electricity use continues to grow, demanding over 7.17 million MWh in 2020 [23].
+
+
+Optimizing across ML pipelines and systems life cycles end-to-end is a complex and challenging task.
+While training large, sparsely-activated neural networks improves model scalability, achieving higher accuracy at lower operational energy footprint [21],
+it can incur higher embodied carbon footprint from the increase in the system resource requirement.
+Shifting model training and inference to data centers with carbon-free energy can reduce emissions; however, this approach may not scale to a broad set of use cases.
+Infrastructure for carbon-free energy is limited by factors such as geography and available materials (e.g. rare metals), and takes significant economic resources and time to build.
+In addition, as on-device learning becomes more ubiquitously adopted to improve data privacy, we can see more computation being shifted away from data centers to the edge, where access to renewable energy is limited.
+
+
+
+A Holistic Approach. This paper is the first to take a holistic approach to characterize the environmental footprint of AI computing from experimentation and training to inference. We characterize the carbon footprint of AI computing by examining the model development cycle across industry-scale machine learning use cases at Facebook (Section II). This is illustrated by the more than 800×\times operational carbon footprint reduction achieved through judicious hardware-software co-design for a Transformer-based universal language model.
+Taking a step further, we present an end-to-end analysis for both operational and embodied carbon footprint for AI training and inference (Section III).
+Based on the industry experience and lessons learned, we chart out opportunities and important development directions across the dimensions of AI including — data, algorithm, systems, metrics, standards, and best practices (Section IV).
+We hope the key messages (Section VI) and the insights in this paper can inspire the community to advance the field of AI in an environmentally-responsible manner.
+
+
+
+
+
+II Model Development Phases and AI System Hardware Life Cycle
+
+
+Figure 3 depicts the major development phases for ML — Data Processing, Experimentation, Training, and Inference (Section II-A) — over the life cycle of AI system hardware (Section II-B).
+Driven by distinct objectives of AI research and advanced product development, infrastructure is designed and built specifically to maximize data storage and ingestion efficiency for the phase of Data Processing, developer efficiency for the phase of Experimentation, training throughput efficiency for the phase of Training, and tail-latency bounded throughput efficiency for Inference.
+
+
+
+II-A Machine Learning Model Development Cycle
+
+
+ML researchers extract features from data during the Data Processing phase and apply weights to individual features based on feature importance to the model optimization objective.
+During Experimentation, the researchers design, implement and evaluate the quality of proposed algorithms, model architectures, modeling techniques, and/or training methods for determining model parameters.
+This model exploration process is computationally-intensive. A large collection of diverse ML ideas are explored simultaneously at-scale.
+Thus, during this phase, we observe unique system resource requirements from the large pool of training experiments.
+Within Facebook’s ML research cluster, 50% (p50) of ML training experiments take up to 1.5 GPU days while 99% (p99) of the experiments complete within 24 GPU days. There are a number of large-scale, trillion parameter models which require over 500 GPUs days.
+
+
+Once a ML solution is determined as promising, it moves into Training where the ML solution is evaluated using extensive production data — data that is more recent, is larger in quantity, and contains richer features.
+The process often requires additional hyper-parameter tuning.
+Depending on the ML task requirement, the models can be trained/re-trained at different frequencies. For example, models supporting Facebook’s Search service were trained at an hourly cadence whereas the Language Translation models were trained weekly [24].
+A p50 production model training workflow takes 2.96 GPU days while a training workflow at p99 can take up to 125 GPU days.
+
+
+Finally, for Inference, the best-performing model is deployed, producing trillions of daily predictions to serve billions of users worldwide.
+The total compute cycles for inference predictions are expected to exceed the corresponding training cycles for the deployed model.
+
+
+
+
+
+II-B Machine Learning System Life Cycle
+
+
+Life Cycle Analysis (LCA) is a common methodology to assess the carbon emissions over the product life cycle. There are four major phases: manufacturing, transport, product use, and recycling222Recycling is an important domain, for which the industry is developing a circular economy model to up-cycle system components — design with recycling in mind.. From the perspective of AI’s carbon footprint analysis, manufacturing and product use are the focus. Thus, in this work, we consider the overall carbon footprint of AI by including manufacturing — carbon emissions from building infrastructures specifically for AI (i.e., embodied carbon footprint) and product use — carbon emissions from the use of AI (i.e., operational carbon footprint).
+
+
+While quantifying the exact breakdown between operational and embodied carbon footprint is a complex process, we estimate the significance of embodied carbon emissions using Facebook’s Greenhouse Gas (GHG) emission statistics333Facebook Sustainability Data: https://sustainability.fb.com/report/2020-sustainability-report/..
+In this case, more than 50% of Facebook’s emissions owe to its value chain — Scope 3 of Facebook’s GHG emission. As a result, a significant embodied carbon cost is paid upfront for every system component brought into Facebook’s fleet of datacenters, where AI is the biggest growth driver.
+
+
+
+
+
+
+III AI Computing’s Carbon Footprint
+
+
+Figure 4: The carbon footprint of the LM model is dominated by Inference whereas, for RM1 – RM5, the carbon footprint of Training versus Inference is roughly equal. The average carbon footprint for ML training tasks at Facebook is 1.8 times larger than that of Meena used in modern conversational agents and 0.3 times of GPT-3’s carbon footprint. Carbon footprint for inference tasks is included for models that are used in production. Note: the operational carbon footprint of AI does not correlate with the number of model parameters. The OSS large-scale ML tasks are based on the vanilla model architectures from [21] and may not be reflective of production use cases.
+
+
+
+III-A Carbon Footprint Analysis for Industry-Scale ML Training and Deployment
+
+
+Figure 4 illustrates the operational carbon emissions for model training and inference across the ML tasks.
+We analyze six representative machine learning models in production at Facebook444In total, the six models account for a vast majority of compute resources for the overall inference predictions at Facebook, serving billions of users world wide..
+LM refers to Facebook’s Transformer-based Universal Language Model for text translation [25].
+RM1 – RM5 represent five unique deep learning recommendation and ranking models for various Facebook products [26, 27].
+
+
+We compare the carbon footprint of Facebook’s production ML models with seven large-scale, open-source (OSS) models: BERT-NAS, T5, Meena, GShard-600B, Switch Transformer, and GPT-3.
+Note, we present the operational carbon footprint of the OSS model training from [28, 21]. The operational carbon footprint results can vary based on the exact AI systems used and the carbon intensity of the energy mixture. Models with more parameters do not necessarily result in longer training time nor higher carbon emissions. Training the Switch Transformer model equipped with 1.5 trillion parameters [29] produces significantly less carbon emission than that of GPT-3 (750 billion parameters) [13]. This illustrates the carbon footprint advantage of operationally-efficient model architectures.
+
+
+Figure 5: When considering the overall life cycle of ML models and systems in this analysis, manufacturing carbon cost is roughly 50% of the (location-based) operational carbon footprint of large-scale ML tasks (Figure 4). Taking into account carbon-free energy, such as solar, the operational energy consumption can be significantly reduced, leaving the manufacturing carbon cost as the dominating source of AI’s carbon footprint.
+
+
+Both Training and Inference can contribute significantly to the overall carbon footprint of machine learning tasks at Facebook.
+The exact breakdown between the two phases varies across ML use cases.
+
+
+The overall operational carbon footprint is categorized into offline training, online training, and inference.
+Offline training encompasses both experimentation and training models with historical data.
+Online training is particularly relevant to recommendation models where parameters are continuously updated based on recent data.
+The inference footprint represents the emission from serving production traffic.
+The online training and inference emissions are considered over the period of offline training.
+For recommendation use cases, we find the carbon footprint is split evenly between training and inference. On the other hand, the carbon footprint of LM is dominated by the inference phase, using much higher inference resources (65%) as compared to training (35%).
+
+
+Both operational and embodied carbon emissions can contribute significantly to the overall footprint of ML tasks.
+
+
+Operational Carbon Footprint:
+Across the life cycle of the Facebook models shown in Figure 4, the average carbon footprint is 1.8×\times higher than that of the open-source Meena model [30] and one-third of GPT-3’s training footprint.
+To quantify the emissions of Facebook’s models we measure the total energy consumed, assume location-based carbon intensities for energy mixes,555Renewable energy and sustainability programs of Facebook [23]. and use a data center Power Usage Effectiveness (PUE) of 1.1.
+In addition to model-level and hardware-level optimizations, Facebook’s renewable energy procurement [23] programs mitigates these emissions.
+
+
+Embodied Carbon Footprint: To quantify the embodied carbon footprint of AI hardware, we use LCA (Section II-B).
+We assume GPU-based AI training systems have similar embodied footprint
+as the production footprint of Apple’s 28-core CPU with dual AMD Radeon GPUs (2000kg CO2) [31].
+For CPU-only systems, we assume half the embodied emissions.
+Based on the characterization of model training and inference at Facebook, we assume an average utilization of 30-60% over the 3- to 5-year lifetime for servers.
+Figure 5 presents the overall carbon footprint for the large scale ML tasks at Facebook, spanning both operational and embodied carbon footprint. Based on the assumptions of location-based renewable energy availability, the split between the embodied and (location-based) operational carbon footprint is roughly 30% / 70% for the large scale ML tasks. Taking into account carbon-free energy, such as solar, the operational carbon footprint can be significantly reduced, leaving the manufacturing carbon cost as the dominating source of AI’s carbon footprint.
+
+
+Figure 6: Optimization is an iterative process — we have achieved an average of 20% operational energy footprint reduction every 6 months across the machine learning hardware-software stack.
+
+
+
+
+III-B Carbon Footprint Optimization from Hardware-Software Co-Design
+
+
+Optimization is an iterative process — we reduce the power footprint across the machine learning hardware-software stack by  20% every 6 months. But at the same time, AI infrastructure continued to scale out. The net effect, with Jevon’s Paradox, is a 28.5% operational power footprint reduction over two years (Figure 8).
+
+
+Optimization across AI Model Development and System Stack over Time:
+Figure 6 shows the operational power footprint reduction across Facebook’s AI fleet over two years.
+The improvement come from four areas of optimizations: model (e.g., designing resource-efficient models), platform (e.g., PyTorch’s support for quantization), infrastructure (e.g., data center optimization and low-precision hardware), and hardware (e.g., domain-specific acceleration).
+Each bar illustrates the operational power reduction across Facebook’s AI fleet over 6-month period from each of the optimization areas.
+The optimizations in aggregate provide, on average, a 20% reduction in operational power consumption every six months.
+The compounded benefits highlight the need for cross-stack optimizations.
+
+
+Figure 7: For the cross-lingual ML task (LM), the operational energy footprint can be significantly reduced by more than 800×800\times using platform-level caching, GPUs, low precision data format, and additional algorithmic optimization.
+
+
+Optimizing the Carbon Footprint of LMs:
+We dive into a specific machine learning task at Facebook: language translation using a Transformer-based architecture (LM).
+LM is designed based on the state-of-the-art cross-lingual understanding through self-supervision.
+Figure 7 analyzes the power footprint improvements over a collection of optimization steps for LM: platform-level caching, GPU acceleration, low precision format on accelerator, and model optimization.
+In aggregate the optimizations reduce the infrastructure resources required to serve LM at scale by over 800×\times.
+We outline the optimization benefits from each area below.
+
+
+•
+
+Platform-Level Caching. Starting with a CPU server baseline, application-level caching improves power efficiency by 6.7×\times. These improvements are a result of pre-computing and caching frequently accessed embeddings for language translation tasks. Using DRAM and Flash storage devices as caches, these pre-computed embeddings can be shared across applications and use cases.
+
+
+
+•
+
+GPU acceleration. In addition to caching, deploying LM across GPU-based specialized AI hardware unlocks an additional 10.1×\times energy efficiency improvement.
+
+
+
+•
+
+Algorithmic optimization. Finally, algorithmic optimizations provide an additional 12×\times energy efficiency reduction. Halving precision (e.g., going from 32-bit to 16-bit operations) provides a 2.4×\times energy efficiency improvement on GPUs. Another 5×\times energy efficiency gain can be achieved by using custom operators to schedule encoding steps within a single kernel of the Transformer module, such as [32].
+
+
+
+
+
+Optimizing the Carbon Footprint of RMs:
+The LM analysis is used as an example to highlight the optimization opportunities available with judicious cross-stack, hardware/software optimization. In addition to optimizing the carbon footprint for the language translation task,
+we describe additional optimization techniques tailored for ranking and recommendation use cases.
+
+
+A major infrastructure challenge faced by deep learning RM training and deployment (RM1 – RM5) is the fast-rising memory capacity and bandwidth demands (Figure 2). There are two primary sub-nets in a RM: the dense fully-connected (FC) network and the sparse embedding-based network. The FC network is constructed with multi-layer perceptions (MLPs), thus computationally-intensive. The embedding network is used to project hundreds of sparse, high-dimensional features to low-dimension vectors. It can easily contribute to over 95% of the total model size. For a number of important recommendation and ranking use cases, the embedding operation dominates the inference execution time [27, 33].
+
+
+To tackle the significant memory capacity and bandwidth requirement, we deploy model quantization for RMs [34].
+Quantization offers two primary efficiency benefits: the low-precision data representation reduces the amount of computation requirement and, at the same time, lowers the overall memory capacity need.
+By converting 32-bit floating-point numerical representation to 16-bit, we can reduce the overall RM2 model size by 15%. This has led to 20.7% reduction in memory bandwidth consumption.
+Furthermore, the memory capacity reduction enabled by quantization unblocks novel systems with lower on-chip memory. For example, for RM1, quantization has enabled RM deployment on highly power-efficient systems with smaller on-chip memory, leading to an end-to-end inference latency improvement of 2.5 times.
+
+
+
+
+III-C Machine Learning Infrastructures at Scale
+
+
+ML Accelerators:
+GPUs are the de-facto training accelerators at Facebook, contributing to significant power capacity investment in the context of Facebook’s fleet of datacenters. However, GPUs can be severely under-utilized during both the ML Experimentation and Training phases (Figure 10) [35]. To amortize the upfront embodied carbon cost of every accelerator deployed into Facebook’s datacenters, maximizing accelerator utilization is a must.
+
+
+Figure 8: The iterative optimization process has led to 28.5% operational energy footprint reduction over the two-year time period (Section III-B). Despite the significant operational power footprint reduction, we continue to see the overall electricity demand for AI to increase over time — an example of Jevon’s Paradox, where efficiency improvement stimulates additional novel AI use cases.
+
+
+Efficiency of Scale: The higher throughput performance density achieved with ML accelerators reduces the total number of processors deployed into datacenter racks. This leads to more effective amortization of shared infrastructure overheads. Furthermore, datacenter capacity is not only limited by physical space but also power capacity — higher operational power efficiency directly reduces the inherited carbon cost from manufacturing of IT infrastructures and datacenter buildings.
+
+
+At-Scale Efficiency Optimization for Facebook Data Centers:
+Servers in Facebook data center fleets are customized for internal workloads only — machine learning tasks [24] or not [36, 37]. Compared to public cloud providers, this puts Facebook at a unique position for at-scale resource management design and optimization. First, Facebookcustomizes server SKUs — compute, memcached, storage tiers and ML accelerators — to maximize performance and power efficiency. Achieving a Power Usage Effectiveness (PUE) of about 1.10, Facebook’s data centers are about 40% more efficient than small-scale, typical data centers.
+
+
+Furthermore, the large-scale deployment of servers of different types provides an opportunity to build performance measurement and optimization tools to ensure high utilization of the underlying infrastructure. For data center fleets in different geographical regions where the actual server utilization exhibits a diurnal pattern, Auto-Scaling frees the over-provisioned capacity during off-peak hours, by up to 25% of the web tier’s machines [38]. By doing so, it provides opportunistic server capacity for others to use, including offline ML training. Furthermore, static power consumption plays a non-trivial role in the context of the overall data center electricity footprint. This motivates more effective processor idle state management.
+
+
+Carbon-Free Energy: Finally, over the past years, Facebookhas invested in carbon free energy sources to neutralize its operational carbon footprint [23].
+Reaching net zero emissions entails matching every unit of energy consumed by data centers with 100% renewable energy purchased by Facebook. Remaining emissions are offset with various sustainability programs, further reducing the operational carbon footprint of AI computing at Facebook. As Section IV-C will later show, more can be done.
+
+
+
+
+III-D Going Beyond Efficiency Optimization
+
+
+Despite the opportunities for optimizing energy efficiency and reducing environmental footprint at scale, there are many reasons why we must care about scaling AI in a more environmentally-sustainable manner. AI growth is multiplicative beyond current industrial use cases. Although domain-specific architectures improve the operational energy footprint of AI model training by more than 90% [21], these architectures require more system resources, leading to larger embodied carbon footprints.
+
+
+Figure 9: As accelerator utilization improves over time, both operational and embodied carbon footprints of AI improve. Carbon-free energy helps reduce the operational carbon footprint, making embodied carbon cost the dominating factor.
+To reduce the rising carbon footprint of AI computing at-scale, we must complement efficiency and utilization optimization with novel approaches to reduce the remaining embodied carbon footprint of AI systems.
+
+
+While shifting model training and inference to data centers with carbon-free energy sources can reduce emissions, the solution may not scale to all AI use cases.
+Infrastructure for carbon free energy is limited by rare metals and materials, and takes significant economic resources and time to build.
+Furthermore, the carbon footprint of federated learning and optimization use cases at the edge is estimated to be similar to that of training a Transformer Big model (Figure 11). As on-device learning becomes more ubiquitously adopted to improve data privacy, we expect to see more computation being shifted away from data centers to the edge, where access to renewable energy may be limited. The edge-cloud space for AI poses interesting design opportunities (Section IV-C).
+
+
+The growth of AI in all dimensions outpaces the efficiency improvement at-scale.
+Figure 9 illustrates that, as GPU utilization is improved (x-axis) for LM training on GPUs, both embodied and operational carbon emissions will reduce. Increasing GPU utilization up to 80%, the overall carbon footprint decreases by 3×\times.
+Powering AI services with renewable energy sources
+can further reduce the overall carbon footprint by a factor of 2. Embodied carbon cost becomes the dominating source of AI’s overall carbon footprint. To curb the rising carbon footprint of AI computing at-scale (Figure 8 and Figure 9), we must look beyond efficiency optimization and complement efficiency and utilization optimization with efforts to tackle the remaining embodied carbon footprint of AI systems.
+
+
+
+
+
+
+IV A Sustainability Mindset for AI
+
+
+To tackle the environmental implications of AI’s exponential growth (Figure 2), the first key step requires ML practitioners and researchers to develop and adopt an sustainability mindset. The solution space is wide open—while there are significant efforts looking at AI system and infrastructure efficiency optimization, the AI data, experimentation, and training algorithm efficiency space (Sections IV-A and IV-B) beyond system design and optimization (Section IV-C) is less well explored.
+We cannot optimize what cannot be measured — telemetry to track the carbon footprint of AI technologies must be adopted by the community (Section V-A).
+We synthesize a number of important directions to scale AI in a sustainable manner and to minimize the environmental impact of AI for the next decades.
+
+
+The field of AI is currently primarily driven by research that seeks to maximize model accuracy — progress is often used synonymously with improved prediction quality. This endless pursuit of higher accuracy over the decade of AI research has significant implications in computational resource requirement and environmental footprint.
+To develop AI technologies responsibly, we must achieve competitive model accuracy at a fixed or even reduced computational and environmental cost.
+Despite the recent calls-to-action [28, 39, 40, 41, 21], the overall community remains under-invested in research that aims at deeply understanding and minimizing the cost of AI. We conjecture the factors that may have contributed to the current state in Appendix A.
+To bend the exponential growth curve of AI and its environmental footprint, we must build a future where efficiency is an evaluation criterion for publishing ML research on computationally-intensive models beyond accuracy-related measures.
+
+
+
+
+IV-A Data Utilization Efficiency
+
+
+Data Scaling and Sampling: No data is like more data — data scaling is the de-facto approach to increase model quality, where the primary factor for accuracy improvement is driven by the size and quality of training data, instead of algorithmic optimization. However, data scaling has significant environmental footprint implications.
+To keep the model training time manageable, overall system resources must be scaled with the increase in the data set size, resulting in larger embodied carbon footprint and operational carbon footprint from the data storage and ingestion pipeline and model training.
+Alternatively, if training system resources are kept fixed, data scaling increases training time, resulting in a larger operational energy footprint.
+
+
+When designed well, however, data scaling, sampling and selection strategies can improve the competitive analysis for ML algorithms, reducing the environmental footprint of the process (Appendix B-A). For instance, Sachdeva et al. demonstrated that intelligent data sampling with merely 10% of data sub-samples can effectively preserve the relative ranking performance of different recommendation algorithms [42]. This ranking performance is achieved with an average of 5.8 times execution time speedup, leading to significant operating carbon footprint reduction.
+
+
+Data Perishability: Understanding key characteristics of data is fundamental to efficient data utilization for AI applications. Not all data is created equal and data collected over time loses its predictive value gradually.
+Understanding the rate at which data loses its predictive value has strong implications on the resulting carbon footprint.
+For example, natural language data sets can lose half of their predictive value in the time period of less than 7 years (the half-life time of data) [43]. The exact half-life period is a function of context. If we were able to predict the half-life time of data, we can devise effective sampling strategies to subset data at different rates based on its half-life.
+By doing so, the resource requirement for the data storage and ingestion pipeline can be significantly reduced [44] — lower training time (operational carbon footprint) as well as storage needs (embodied carbon footprint).
+
+
+
+
+IV-B Experimentation and Training Efficiency
+
+
+The experimentation and training phases are closely coupled (Section II).
+There is a natural trade-off between the investment in experimentation and the subsequent training cost (Section III).
+Neural architecture search (NAS) and hyperparameter optimization (HPO) are techniques that automate the design space exploration. Despite their capability to discover higher-performing neural networks, NAS and HPO can be extremely resource-intensive, involving training many models, especially when using simple approaches. Strubell et al. show that grid-search NAS can incur over 3000×3000\times environmental footprint overhead [28].
+Utilizing much more sample-efficient NAS and HPO methods [45, 46] can translate directly into carbon footprint improvement.
+In addition to reducing the number of training experiments, one can also reduce the training time of each experiment.
+By detecting and stopping under-performing training workflows early, unnecessary training cycles can be eliminated.
+
+
+Multi-objective optimization explores the Pareto frontier of efficient model quality and system resource trade-offs. If used early in the model exploration process, it enables more informed decisions about which model to train fully and deploy given certain infrastructure capacity.
+Beyond model accuracy and timing performance [47, 48, 49, 50], energy and carbon footprint can be directly incorporated into the cost function as optimization objectives to enable discovery of environmentally-friendly models.
+Furthermore, when training is decoupled from NAS, sub-networks tailoring to specialized system hardware can be selected without additional training [51, 52, 53, 54]. Such approaches can significantly reduce the overall training time, however, at the expense of increased embodied carbon footprint.
+
+
+Developing resource-efficient model architectures fundamentally reduce the overall system capacity need of ML tasks.
+From the systems perspective, accelerator memory is scarce.
+However, DNNs, such as neural recommendation models, require significantly higher memory capacity and bandwidth [55, 33].
+This motivates researchers to develop memory-efficient model architectures. For example, the Tensor-Train compression technique (TT-Rec) achieves more than 100×\times memory capacity reduction with negligible training time and accuracy trade-off [56]. Similarly, the design space trade-off between memory capacity requirement, training time, and model accuracy is also explored in Deep Hash Embedding (DHE) [57]. While training time increases lead to higher operational carbon footprint, in the case of TT-Rec and DHE, the memory-efficient model architectures require significantly lower memory capacity while better utilizing the computational capability of training accelerators, resulting in lower embodied carbon footprint.
+
+
+Developing efficient training algorithms is a long-time objective of research in optimization and numerical methods [58].
+Evaluations of optimization methods should account for all experimentation efforts required to tune optimizer hyperparameters, not just the method performance after tuning [59, 60].
+In addition,
+significant research has gone into algorithmic approaches to efficiently scale training [61, 62] by reducing communication cost via compression [63, 64], pipelining [65], and sharding [66, 67]. The advances have enabled efficient scaling to larger models and larger datasets.
+We expect efficient training methods to continue as an important domain.
+While this paper has focused on supervised learning relying labeled data,
+algorithmic efficiency extends to other learning paradigms including self-supervised and semi-supervised learning (Appendix B-C).
+
+
+
+
+IV-C Efficient, Environmentally-Sustainable AI Infrastructure and System Hardware
+
+
+To amortize the embodied carbon footprint, model developers and system architects must maximize the utilization of accelerator and system resources when in use and prolong the lifetime of AI infrastructures.
+Existing practices such as the move to domain-specific architectures at cloud scale [68, 69, 70] reduce AI computing’s footprint by consolidating computing resources at scale and by operating the shared infrastructures more environmentally-friendly with carbon free energy666We discuss additional important directions for building environmentally-sustainable systems in Appendix B-B, including datacenter infrastructure disaggregation; fault tolerant, resilient AI systems..
+
+
+Figure 10: A vast majority of model experimentation (over tens of thousands of training workflows) utilizes GPUs at only 30-50%, leaving room for utilization and efficiency improvements.
+
+
+Accelerator Virtualization and Multi-Tenancy Support: Figure 10 illustrates the utilization of GPU accelerators in Facebook’s research training infrastructure. A significant portion of machine learning model experimentation utilizes GPUs at only 30-50%, leaving significant room for improvements to efficiency and overall utilization. Virtualization and workload consolidation technologies can help maximize accelerator utilization [71]. Google’s TPUs have also recently started supporting virtualization [72]. Multi-tenancy for AI accelerators is gaining traction as an effective way to improve resource utilization, thereby amortizing the upfront embodied carbon footprint of customized system hardware for AI at the expense of potential operational carbon footprint increase [73, 74, 75, 76, 77].
+
+
+Environmental Sustainability as a Key AI System Design Principle:
+Today, servers are designed to optimize performance and power efficiency.
+However, system design with a focus on operational energy efficiency optimization does not always produce the most environmentally-sustainable solution [78, 79, 19].
+With the rising embodied carbon cost and the exponential demand growth of AI, system designers and architects must re-think fundamental system hardware design principles to minimize computing’s footprint end-to-end, considering the entire hardware and ML model development life cycle. In addition to the respective performance, power, and cost profiles, the environmental footprint characteristics of processors over the generations of CMOS technologies, DDRx and HBM memory technologies, SSD/NAND-flash/HDD storage technologies can be orders-of-magnitude different [80]. Thus, designing AI systems with the least environmental impact requires explicit consideration of environmental footprint characteristics at the design time.
+
+
+The Implications of General-Purpose Processors, General-Purpose Accelerators, Reconfigurable Systems, and ASICs for AI:
+There is a wide variety of system hardware choices for AI from general-purpose processors (CPUs), general-purpose accelerators (GPUs or TPUs), field-programmable gate arrays (FPGAs) [81], to application-specific integrated circuit (ASIC), such as Eyeriss [82].
+The exact system deployment choice can be multifaceted —
+the cadence of ML algorithm and model architecture evolution, the diversity of ML use cases and the respective system resource requirements, and the maturity of the software stack.
+While ML accelerator deployment brings a step-function improvement in operational energy efficiency, it may not necessarily reduce the carbon footprint of AI computing overall. This is because of the upfront embodied carbon footprint associated with the different system hardware choices.
+From the environmental sustainability perspective, the optimal point depends on the compounding factor of operational efficiency improvement over generations of ML algorithms/models, deployment lifetime and embodied carbon footprint of the system hardware. Thus, to design for environmental sustainability, one must strike a careful balance between efficiency and flexibility and, at the same time, consider environmental impact as a key design dimension for next-generation AI systems.
+
+
+Carbon-Efficient Scheduling for AI Computing At-Scale:
+As the electricity consumption of hyperscale data centers continues to rise, data center operators have devoted significant investment to neutralize operational carbon footprint.
+By operating large-scale computing infrastructures with carbon free energy, technology companies
+are taking an important step to address the environmental implications of computing.
+More can be done however.
+
+
+As the renewable energy proportion in the electricity grid increases, fluctuations in
+energy generation will increase due to the intermittent nature of renewable energy sources (i.e. wind, solar). Elastic carbon-aware workload scheduling techniques
+can be used in and across datacenters to predict and exploit the intermittent energy generation patterns [83]. However such scheduling algorithms might require server over-provisioning to allow for flexibility of shifting workloads to times when carbon-free energy is available.
+Furthermore, any additional server capacity comes with manufacturing carbon cost
+which needs to be incorporated into the design space.
+Alternatively, energy storage (e.g. batteries, pumped hydro, flywheels, molten salt) can be used to store renewable
+energy during peak generation times for use during low generation times.
+There is an interesting design space to achieve 24/7 carbon-free AI computing.
+
+
+Figure 11: Federated learning and optimization can result in a non-negligible amount of carbon emissions, equivalent to the carbon footprint of training T​r​a​n​s​f​o​r​m​e​rB​i​g𝑇𝑟𝑎𝑛𝑠𝑓𝑜𝑟𝑚𝑒subscript𝑟𝐵𝑖𝑔Transformer_{Big} [21]. FL-1 and FL-2 represent two production FL applications.
+P100-Base represents the carbon footprint of T​r​a​n​s​f​o​r​m​e​rB​i​g𝑇𝑟𝑎𝑛𝑠𝑓𝑜𝑟𝑚𝑒subscript𝑟𝐵𝑖𝑔Transformer_{Big} training on P100 GPU
+whereas TPU-base is T​r​a​n​s​f​o​r​m​e​rB​i​g𝑇𝑟𝑎𝑛𝑠𝑓𝑜𝑟𝑚𝑒subscript𝑟𝐵𝑖𝑔Transformer_{Big} training on TPU. P100-Green and TPU-Green consider renewable energy at the cloud (Methodology detail in Appendix B-B).
+
+
+On-Device Learning
+On-device AI is becoming more ubiquitously adopted to enable model personalization [84, 85, 86] while improving data privacy [87, 88, 89, 90], yet its impact in terms of carbon emission is often overlooked.
+On-device learning emits non-negligible carbon. Figure 11 illustrates that the operational carbon footprint for training a small ML task using federated learning (FL) is comparable to that of training an orders-of-magnitude larger Transformer-based model in a centralized setting.
+As FL trains local models on client devices and periodically aggregates the model parameters for a global model, without collecting raw user data [87],
+the FL process can emit non-negligible carbon at the edge due to both computation and wireless communication.
+
+
+It is important to reduce AI’s environmental footprint at the edge. With the ever-increasing demand for on-device use cases over billions of client devices, such as teaching AI to understand the physical environment from the first-person perception [91] or personalizing AI tasks, the carbon footprint for on-device AI can add up to a dire amount quickly. Also, renewable energy is far more limited for client devices compared to datacenters.
+Optimizing the overall energy efficiency of FL and on-device AI is an important first step [92, 93, 94, 95, 96]. Reducing embodied carbon cost for edge devices is also important, as
+manufacturing carbon cost accounts for 74% of the total footprint [19] of client devices.
+It is particularly challenging to amortize the embodied carbon footprint because client devices are often under-utilized [97].
+
+
+
+
+
+
+V Call-to-Action
+
+
+
+V-A Development of Easy-to-Adopt Telemetry for Assessing AI’s Environmental Footprint
+
+
+While the open source community has started building tools to enable automatic measurement of AI training’s environmental footprint [39, 40, 98, 99] and the ML research community requiring a broader impact statement for the submitted research manuscript, more can be done in order to incorporate efficiency and sustainability into the design process.
+Enabling carbon accounting methodologies and telemetry that is easy to adopt is an important step to quantify the significance of our progress in developing AI technologies in an environmentally-responsible manner. While assessing the novelty and quality of ML solutions, it is crucial to consider sustainability metrics including energy consumption and carbon footprint along with measures of model quality and system performance.
+
+
+Metrics for AI Model and System Life Cycles: Standard carbon footprint accounting methods for AI’s overall carbon footprint are at a nascent stage. We need simple, easy-to-adopt metrics to make fair and useful comparisons between AI innovations. Many different aspects must be accounted for, including the life cycles of both AI models (Data, Experimentation, Training, Deployment) and system hardware (Manufacturing and Use) (Section II).
+
+
+In addition to incorporating an efficiency measure as part of leader boards for various ML tasks, data [100], models777Papers with code: https://paperswithcode.com/sota/image-classification-on-imagenet, training algorithms [101], environmental impact must also be considered and adopted by AI system hardware developers.
+For example, MLPerf [102, 103, 104] is the industry standard for ML system performance comparison.
+The industry has witnessed significantly higher system performance speedup, outstripping what is enabled by Moore’s Law [105, 106]. Moreover,
+an algorithm efficiency benchmark is under development888https://github.com/mlcommons/algorithmic-efficiency/.
+The MLPerf benchmark standards can advance the field of AI in an environmentally-competitive manner by enabling the measurement of energy and/or carbon footprint.
+
+
+Carbon Impact Statements and Model Cards:
+We believe it is important for all published research papers to disclose the operational and embodied carbon footprint of proposed design; we are only at the beginning of this journey999https://2021.naacl.org/ethics/faq/#-if-my-paper-reports-on-experiments-that-involve-lots-of-compute-timepower. Note, while embodied carbon footprints for AI hardware may not be readily available, describing hardware platforms, the number of machines, total runtime used to produce results presented in a research manuscript is an important first step.
+In addition, new models must be associated with a model card that, among other aspects of data sets and models [107], describes the model’s overall carbon footprint to train and conduct inference.
+
+
+
+
+
+
+VI Key Takeaways
+
+
+The Growth of AI: Deep learning has witnessed an exponential growth in training data, model parameters, and system resources over the recent years (Figure 2).
+The amount of data for AI has grown by 2.4×2.4\times, leading to 3.2×3.2\times increase in the data ingestion bandwidth demand at Facebook.
+Facebook’s recommendation model sizes have increased by 20×20\times between 2019 and 2021.
+The explosive growth in AI use cases has driven 2.9×2.9\times and 2.5×2.5\times capacity increases for AI training and inference at Facebook over the recent 18 months, respectively.
+The environmental footprint of AI is staggering (Figure 4, Figure 5).
+
+
+A Holistic Approach: To ensure an environmentally-sustainable growth of AI, we must consider the AI ecosystem holistically going forward.
+We must look at the machine learning pipelines end-to-end — data collection, model exploration and experimentation, model training, optimization and run-time inference (Section II).
+The frequency of training and scale of each stage of the ML pipeline must be considered to understand salient bottlenecks to sustainable AI.
+From the system’s perspective, the life cycle of model development and system hardware, including manufacturing and operational use, must also be accounted for.
+
+
+Efficiency Optimization:
+Optimization across the axes of algorithms, platforms, infrastructures, hardware can significantly reduce the operational carbon footprint for the Transformer-based universal translation model by 810×810\times. Along with other efficiency optimization at-scale, this has translated into 25.8% operational energy footprint reduction over the two-year period.
+More must be done to bend the environmental impact from the exponential growth of AI (Figure 8 and Figure 9).
+
+
+An Sustainability Mindset for AI: Optimization beyond efficiency across the software and hardware stack at scale is crucial to enabling future sustainable AI systems.
+To develop AI technologies responsibly, we must achieve competitive model accuracy at a fixed or even reduced computational and environmental cost. We chart out potentially high-impact research and development directions across the data, algorithms and model, experimentation and system hardware, and telemetry dimensions for AI at datacenters and at the edge (Section IV).
+
+
+We must take a deliberate approach when developing AI research and technologies, considering the environmental impact of innovations and taking a responsible approach to technology development [108]. That is, we need AI to be green and environmentally-sustainable.
+
+
+
+
+
+VII Conclusion
+
+
+This paper is the first effort to explore the environmental impact of the super-linear trends for AI growth from a holistic perspective, spanning data, algorithms, and system hardware. We characterize the carbon footprint of AI computing by examining the model development cycle across industry-scale ML use cases at Facebook and, at the same time, considering the life cycle of system hardware. Furthermore, we capture the operational and manufacturing carbon footprint of AI computing and present an end-to-end analysis for what and how hardware-software design and at-scale optimization can help reduce the overall carbon footprint of AI. We share the key challenges and chart out important directions across all dimensions of AI—data, algorithms, systems, metrics, standards, and best experimentation practices.
+Advancing the field of machine intelligence must not in turn make climate change worse. We must develop AI technologies with a deeper understanding of the societal and environmental implications.

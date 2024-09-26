@@ -1,0 +1,800 @@
+Abstract:
+
+Abstract
+The carbon footprint associated with large language models (LLMs) is a significant concern, encompassing emissions from their training, inference, experimentation, and storage processes, including operational and embodied carbon emissions. An essential aspect is accurately estimating the carbon impact of emerging LLMs even before their training, which heavily relies on GPU usage. Existing studies have reported the carbon footprint of LLM training, but only one tool, mlco2, can predict the carbon footprint of new neural networks prior to physical training. However, mlco2 has several serious limitations. It cannot extend its estimation to dense or mixture-of-experts (MoE) LLMs, disregards critical architectural parameters, focuses solely on GPUs, and cannot model embodied carbon footprints. Addressing these gaps, we introduce LLMCarbon, an end-to-end carbon footprint projection model designed for both dense and MoE LLMs. Compared to mlco2, LLMCarbon significantly enhances the accuracy of carbon footprint estimations for various LLMs. The source code is released at https://github.com/SotaroKaneda/MLCarbon.
+
+
+
+
+1 Introduction
+
+Large language models (LLMs) have established their supremacy in addressing a wide spectrum of natural language processing tasks (Brown et al., 2020). However, the proliferation of these models, coupled with increasingly expansive datasets (Sanderson, 2023; Anil et al., 2023), has woven LLM inferences into the fabric of everyday life (Campello de Souza et al., 2023). This surge in LLM adoption has, in turn, exacerbated the already considerable environmental impacts associated with machine learning (ML) (Thompson et al., 2021). For instance, the creation of a transformer with 213 million parameters through neural architecture search has been likened to the carbon dioxide equivalent (CO2eq) emissions of five cars over their entire lifespans (Strubell et al., 2019).
+
+
+Given the ecological implications of LLMs, it becomes essential for both cloud service providers and regular users to gain a profound understanding of the carbon footprint of emerging LLMs. This awareness is particularly critical before embarking on resource-intensive training endeavors that entail the utilization of thousands of GPUs. During the initial design phase, key parameters such as the LLM’s parameter count, hardware configurations, and the energy efficiency of the hosting data center need to be factored into a robust carbon footprint projection model. This model should possess the capability to swiftly and accurately estimate the carbon footprint, encompassing both operational and embodied carbon emissions. Moreover, it should provide valuable insights into metrics like test loss, training duration, and inference latency, all crucial aspects of LLM performance. The existence of such a carbon footprint projection model empowers cloud providers to intelligently explore the trade-off between test loss and carbon footprint when designing new LLMs. Additionally, it encourages everyday users to adopt practices that mitigate LLM carbon footprints by facilitating quantitative comparisons across various LLM configurations.
+
+
+Currently, there is a notable void in the availability of a comprehensive end-to-end carbon footprint projection model tailored specifically for LLMs. Prior research efforts (Henderson et al., 2020; Wu et al., 2022; Anthony et al., 2020; Schwartz et al., 2020; Patterson et al., 2021; Dodge et al., 2022; Strubell et al., 2019; Lakim et al., 2022) have predominantly focused on recording and reporting the carbon footprint associated with the training phase of ML models. To date, only one tool, mlco2 (Lacoste et al., 2019), has emerged capable of predicting the carbon footprint of an ML task based on parameters like GPU usage, training duration, and data center efficiency. However, mlco2 exhibits several serious limitations. Firstly, it is confined to convolutional neural networks (CNNs) and cannot extend its estimations to include the carbon footprint of LLMs. Secondly, mlco2 neglects crucial architectural aspects of ML models, such as parameter counts, resulting in overestimated projections. Thirdly, it exclusively considers GPUs, disregarding specialized ML hardware like TPUs (Jouppi et al., 2017), and assumes uniform peak computing throughput across GPUs, leading to inaccuracies in its carbon footprint assessments. Lastly, although the embodied carbon footprint of an ML task holds equal significance to its operational carbon footprint (Wu et al., 2022), mlco2 is incapable of modeling the embodied carbon footprint of an LLM based on its hardware resources.
+
+
+In this paper, we propose an end-to-end carbon footprint projection model, LLMCarbon, which can accurately predict the carbon footprint of both dense and MoE LLMs during their training, inference, experimentation, and storage phases. LLMCarbon incorporates critical LLM, hardware, and data center parameters, such as LLM parameter count, hardware type, system power, chip area, and data center efficiency, to model both operational and embodied carbon footprints of an LLM. When validated against Google’s published LLM carbon footprints, the results generated by LLMCarbon exhibit differences of only ≤8.2%absentpercent8.2\leq 8.2\%, and thus are more accurate than those of mlco2.
+
+
+
+
+
+2 Background
+
+LLM Carbon Footprint. The carbon footprint of a LLM comprises two fundamental components (Gupta et al., 2022): the operational footprint, encompassing emissions stemming from hardware energy consumption, and the embodied footprint, encapsulating emissions arising from hardware manufacturing. Previous investigations (Henderson et al., 2020; Wu et al., 2022; Anthony et al., 2020; Schwartz et al., 2020; Patterson et al., 2022; Dodge et al., 2022; Strubell et al., 2019) have predominantly focused on recording and reporting the operational carbon footprint of various ML tasks. A notable exception is Wu et al. (2022), which delved into the embodied carbon footprint of ML tasks and revealed that within a Meta data center, the embodied carbon footprint of an LLM constitutes ∼50%similar-toabsentpercent50\sim 50\% of its operational carbon footprint.
+
+
+Neural Scaling Law. The Neural Scaling Law (Kaplan et al., 2020) delineates a power-law relationship linking an LLM’s test loss to three key factors: the number of model parameters, the scale of the training dataset, and the computational resources utilized during training. This relationship holds across diverse architectures and downstream ML tasks, spanning zero-shot, prompted, and fine-tuned scenarios (Caballero et al., 2023).
+
+
+Reducing LLM Carbon Footprint. Efforts on reducing LLM carbon footprints have been channeled into 4 domains. Firstly, sparse MoE architectures (Fedus et al., 2022) have been proposed to enhance LLM performance by increasing model parameters while maintaining a similar computational load. Secondly, the adoption of specialized ML hardware, such as TPUs (Jouppi et al., 2017), has emerged as a more energy-efficient alternative to power-hungry GPUs. Thirdly, ML-focused data centers have optimized their facilities into large-scale systems, reducing cooling and infrastructure overhead to enhance power usage effectiveness (PUE) (Liu et al., 2020). Lastly, these data centers are transitioning to renewable energy sources like solar and wind power (Acun et al., 2023) to mitigate the operational carbon footprint of LLMs. However, the recent proliferation of ML-specific hardware within these data centers, driven by the diverse demands of ML tasks, is widening the gap between operational and embodied carbon footprints in the near future (Wu et al., 2022).
+
+
+Parallelism in LLM Processing. Effective processing of LLMs necessitates the utilization of multiple computing devices, such as GPUs or TPUs, owing to significant LLM parameter counts. Four types of parallelism, i.e., data, tensor, pipeline, and expert, are commonly employed to enhance hardware efficiency, quantified as actual throughput relative to peak throughput.
+
+
+•
+
+Data Parallelism: In data parallelism (Xing et al., 2015), the full LLM model is distributed to each computing device, while the input dataset is divided among these devices. Periodic gradient aggregation ensures that all devices maintain consistent model weights.
+
+
+
+•
+
+Tensor Parallelism: Tensor parallelism (Narayanan et al., 2021) involves distributing an LLM’s layers across multiple devices. Within a transformer layer, the self-attention block partitions key, query, and value matrices through column-wise division. The output linear layer directly handles the attention operation’s partitioned output, with weight matrix partitioning by rows. In the two-layer MLP, the first layer is divided along columns, and the second along rows. Efficient data coordination among partitions on different devices is achieved through two all-reduce operations in forward and backward passes.
+
+
+
+•
+
+Pipeline Parallelism: In pipeline parallelism (Narayanan et al., 2021), an LLM’s layers are distributed across multiple devices. Each device handles an equal number of layers, and microbatches split a batch for pipelined execution. Synchronous weight updates are ensured through pipelining. However, periodic pipeline flushes to synchronize steps across devices introduce “pipeline bubbles” at batch starts and ends, which need to be minimized for efficient pipeline model parallelism.
+
+
+
+•
+
+Expert Parallelism: Expert parallelism (Kim et al., 2021) is tailored for parallelizing the training of MoE LLMs. This approach involves distributing distinct experts across various devices, enabling parallel execution. However, due to the separation of experts across multiple computing devices, explicit communication using all-to-all primitives becomes essential.
+
+
+
+
+
+Table 1: The comparison of LLMCarbon against prior work.
+
+
+
+scheme
+predictive
+MoE
+architectural
+specialized
+operational
+embodied
+
+
+modeling
+support
+parameters
+hardware
+carbon
+carbon
+
+
+mlco2
+✓
+✗
+✗
+✗
+
+
+✗
+
+
+others
+✗
+✗
+✗
+✗
+✓
+✓
+
+
+LLMCarbon
+✓
+✓
+✓
+✓
+✓
+✓
+
+
+
+
+
+
+
+
+3 Related Work
+
+Table 1 provides a comparison between LLMCarbon and existing research endeavors. The predominant focus of prior studies (Henderson et al., 2020; Wu et al., 2022; Anthony et al., 2020; Schwartz et al., 2020; Dodge et al., 2022; Strubell et al., 2019) has been the measurement and reporting of carbon footprints associated with the actual training phase of ML models, denoted as “others” in the table. Notably, only one previous model, mlco2 (Lacoste et al., 2019), possesses the capability to predict the carbon footprint of an ML task based on metrics like GPU utilization, training duration, and data center efficiency. Nevertheless, mlco2 encounters four significant limitations. Firstly, mlco2 cannot estimate the carbon footprint of LLMs, particularly sparse MoE LLMs. Secondly, it overlooks essential architectural attributes of LLMs, such as LLM parameter count, resulting in exaggerated predictions. Thirdly, mlco2 exclusively considers GPUs and neglects specialized ML hardware like TPUs (Jouppi et al., 2017), assuming uniform peak computing throughput across all GPUs, thereby yielding imprecise carbon footprint estimations. Lastly, mlco2 cannot model the embodied carbon footprint of an LLM based on its hardware configuration.
+
+
+
+
+
+4 LLMCarbon
+
+
+4.1 Overview
+
+Figure 1: The overview of LLMCarbon.
+
+
+Figure 1 presents an overview of LLMCarbon for predicting the carbon footprint of an LLM. The inputs to LLMCarbon encompass the LLM’s architectural description, data center specification, and hardware configuration. To output the LLM’s carbon footprint, LLMCarbon employs a series of models, each processing specific input details. LLMCarbon can use the parameter model to determine the LLM’s parameter count based on its architectural attributes, or directly accept the LLM’s parameter count as input. With the LLM’s parameter count and training token count, LLMCarbon calculates the test loss by the neural scaling law (Kaplan et al., 2020), and employs the FLOP model to estimate the volume of FLOPs required for LLM processing. Through the parameter count, LLMCarbon generates the optimal data, tensor, pipeline, and expert parallelism setting. Taking into account the parallelism setting and hardware configuration, LLMCarbon’s hardware efficiency model computes the hardware efficiency, representing the real computing throughput divided by the peak computing throughput. Utilizing data center details, hardware efficiency, and FLOP count, LLMCarbon applies the operational carbon model to derive the LLM’s operational carbon footprint. Similarly, by considering the hardware configuration, LLMCarbon’s embodied carbon model yields the LLM’s embodied carbon footprint. The overall carbon footprint of the LLM is then computed by summing both the operational and embodied carbon footprints.
+
+
+
+
+4.2 Parameter Model
+
+Among all LLM architectural attributes, the LLM parameter count has the largest impact on test loss (Kaplan et al., 2020). To reduce projection errors, LLMCarbon can take the parameter count as direct input, or estimate the parameter count by the parameter model. The parameter model’s input comprises the LLM’s architectural parameters including the hidden size (hℎh), the number of layers (l𝑙l), the vocabulary size (V𝑉V), and the number of experts (Nesubscript𝑁𝑒N_{e}). For a dense LLM, we calculate its parameter count (Pdsubscript𝑃𝑑P_{d}) by Equation 1 (Narayanan et al., 2021). An MoE LLM (Rajbhandari et al., 2022) replaces ρ𝜌\rho (ρ∈(0,1]𝜌01\rho\in(0,1]) feed-forward layers in its counterpart dense LLM with MoE layers. An MoE layer’s parameter count is the sum of the expert parameter count (Pe​x​p=8​h2​Nesubscript𝑃𝑒𝑥𝑝8superscriptℎ2subscript𝑁𝑒P_{exp}=8h^{2}N_{e}) and the self-attention parameter count (Pa​t​t=4​h2subscript𝑃𝑎𝑡𝑡4superscriptℎ2P_{att}=4h^{2}), so the parameter count (Pesubscript𝑃𝑒P_{e}) of an MoE LLM can be computed using Equation 2. The parameter model of LLMs adopting an encoder-decoder architecture can be viewed in Appendix A.
+
+
+
+
+
+Pd≈12​l​h2+V​hsubscript𝑃𝑑12𝑙superscriptℎ2𝑉ℎP_{d}\approx 12lh^{2}+Vh
+
+(1)
+
+
+
+
+
+
+Pe≈(1−ρ)​Pd+ρ​(4​h2+8​h2​Ne)​lsubscript𝑃𝑒1𝜌subscript𝑃𝑑𝜌4superscriptℎ28superscriptℎ2subscript𝑁𝑒𝑙P_{e}\approx(1-\rho)P_{d}+\rho(4h^{2}+8h^{2}N_{e})l
+
+(2)
+
+
+
+
+
+
+4.3 Neural Scaling Law
+
+The neural scaling law (Kaplan et al., 2020) predicts an LLM’s test loss based on its parameter count P𝑃P and the training dataset size D𝐷D. For ensuring the comparability of test losses across various models, sizes, and datasets, we adopt the Chinchilla scaling law (Hoffmann et al., 2022) formulated as Equation 3, where A𝐴A, B𝐵B, α𝛼\alpha, β𝛽\beta, and E𝐸E are fitting constants. The test loss L𝐿L equals to the summation of an irreducible term E𝐸E and a reducible term diminishing through the scaling of P𝑃P and D𝐷D.
+
+
+
+
+
+L​(P,D)=APα+BDβ+E𝐿𝑃𝐷𝐴superscript𝑃𝛼𝐵superscript𝐷𝛽𝐸L(P,D)=\frac{A}{P^{\alpha}}+\frac{B}{D^{\beta}}+E
+
+(3)
+
+
+
+
+
+
+T​C≈6​P​D𝑇𝐶6𝑃𝐷TC\approx 6PD
+
+(4)
+
+
+
+
+
+
+I​C≈2​P​D𝐼𝐶2𝑃𝐷IC\approx 2PD
+
+(5)
+
+
+
+
+
+
+4.4 FLOP Model
+
+The FLOP model receives two inputs: the count of parameters (P𝑃P) and the number of tokens (D𝐷D) processed by the LLM processing. The primary component of FLOPs is the multiply-accumulate operations involving LLM weights and intermediate results. Within our FLOP model, the FLOP count necessary for training a dense LLM (T​C𝑇𝐶TC) is estimated using Equation 4. For dense LLM inferences, the FLOP count (I​C𝐼𝐶IC) is approximated as per Equation 5. To compute the FLOP count for MoE LLM processing, we input the parameter number of the dense base model (Rajbhandari et al., 2022) of the MoE LLM into Equations 4 and 5, respectively.
+
+
+
+
+4.5 Hardware Efficiency Model
+
+Efficient processing of LLMs relies on achieving high hardware efficiency, which is calculated as the actual computing throughput divided by the peak throughput. This efficiency is largely determined by the optimal configuration of data, tensor, pipeline, and expert parallelism, along with the number of devices used for the task. Using too few or too many devices or improperly configuring parallelism can lead to reduced hardware efficiency. For example, achieving optimal parallelism for GPT-3 with 175 billion parameters requires 1.5K V100 GPUs, resulting in a hardware efficiency of 47% (Narayanan et al., 2021). Conversely, an unoptimized configuration using 10K V100 GPUs yields a substantially lower hardware efficiency of only 19.7% (Patterson et al., 2021).
+
+
+
+
+
+Figure 2: The parallelism setting for processing dense LLMs.
+
+
+
+
+Figure 3: The parallelism setting for processing MoE LLMs.
+
+
+
+
+Figure 4: The computing device number for processing LLMs.
+
+
+
+
+Figure 5: The hardware efficiency for processing LLMs.
+
+
+
+
+
+Optimal Parallelism Setting. The optimal parallelism setting is represented as (p,t,d,e)𝑝𝑡𝑑𝑒(p,t,d,e), where each variable corresponds to a degree of pipeline, tensor, data, and expert parallelism, respectively. For dense LLMs, optimal settings are derived from (Narayanan et al., 2021), depicted in Figure 5, where e=1𝑒1e=1 is omitted. Initially, we increase tensor parallelism (t𝑡t) up to z𝑧z (e.g., z=8𝑧8z=8) when employing z𝑧z-device servers (Narayanan et al., 2021), each containing z𝑧z interconnected devices. This increment in t𝑡t is confined to avoid exceeding communication bandwidth limits. Once z𝑧z is reached, further scaling for larger LLMs involves increasing pipeline parallelism (p𝑝p) (Narayanan et al., 2021). However, the product of t𝑡t and p𝑝p (t⋅p⋅𝑡𝑝t\cdot p) must not exceed a certain threshold to ensure that LLM parameters and intermediate data fit into device memory. The number of devices required to achieve optimal hardware efficiency for dense LLM processing is calculated as n=t⋅p⋅d𝑛⋅𝑡𝑝𝑑n=t\cdot p\cdot d (Narayanan et al., 2021), and can be viewed in Figure 5. A polynomial regression model is used to predict optimal hardware efficiency based on these parameters. For MoE LLMs, the optimal parallelism settings are adopted from (Chen et al., 2023). As Figure 5 shows, assuming 64 experts within an MoE LLM, expert parallelism (e𝑒e) is always set to 64, intertwining d𝑑d and e𝑒e for a uniform expert distribution. To reduce inter-device all-to-all communications, d𝑑d is fixed at 1. Scaling MoE LLM parallelism is achieved by increasing pipeline parallelism (p𝑝p). The number of devices required for optimal hardware efficiency in MoE LLM processing is also calculated as n=t⋅p⋅d𝑛⋅𝑡𝑝𝑑n=t\cdot p\cdot d. As Figure 5 exhibits, MoE LLMs require fewer devices compared to dense LLMs with equivalent parameter counts due to their lower computational overhead. The optimal hardware efficiency during MoE LLM processing is represented in Figure 5. MoE LLMs achieve ∼80%similar-toabsentpercent80\sim 80\% (Chen et al., 2023) of the optimal hardware efficiency of their dense base models, due to extra host-device memory swaps.
+
+
+
+
+
+𝑒𝑓𝑓r​e={γ0⋅r​en⋅𝑒𝑓𝑓nr​e<nγ1⋅nr​e⋅𝑒𝑓𝑓n+γ2r​e>nsubscript𝑒𝑓𝑓𝑟𝑒cases⋅subscript𝛾0𝑟𝑒𝑛subscript𝑒𝑓𝑓𝑛𝑟𝑒𝑛⋅subscript𝛾1𝑛𝑟𝑒subscript𝑒𝑓𝑓𝑛subscript𝛾2𝑟𝑒𝑛\mathit{eff}_{re}=\begin{cases}\gamma_{0}\cdot\frac{re}{n}\cdot\mathit{eff}_{n}&\text{$re<n$}\\
+\gamma_{1}\cdot\frac{n}{re}\cdot\mathit{eff}_{n}+\gamma_{2}&\text{$re>n$}\end{cases}
+
+(6)
+
+
+
+
+
+
+t𝑑𝑒𝑣=𝑇𝐹𝐿𝑂𝑃nd​e​v⋅𝐹𝐿𝑂𝑃𝑝𝑒𝑎𝑘⋅𝑒𝑓𝑓subscript𝑡𝑑𝑒𝑣𝑇𝐹𝐿𝑂𝑃⋅subscript𝑛𝑑𝑒𝑣subscript𝐹𝐿𝑂𝑃𝑝𝑒𝑎𝑘𝑒𝑓𝑓t_{\mathit{dev}}=\frac{\mathit{TFLOP}}{n_{dev}\cdot\mathit{FLOP}_{\mathit{peak}}\cdot\mathit{eff}}
+
+(7)
+
+
+
+
+Fewer or More Computing Devices. When the number of computing devices is not equal to t⋅p⋅d⋅𝑡𝑝𝑑t\cdot p\cdot d, the hardware efficiency decreases. The efficiency (𝑒𝑓𝑓r​esubscript𝑒𝑓𝑓𝑟𝑒\mathit{eff}_{re}) with r​e𝑟𝑒re devices can be calculated using Equation 6, where γ0∼γ2similar-tosubscript𝛾0subscript𝛾2\gamma_{0}\sim\gamma_{2} are fitting constants, 𝑒𝑓𝑓nsubscript𝑒𝑓𝑓𝑛\mathit{eff}_{n} means the highest hardware efficiency, and n𝑛n indicates the number of devices that can achieve 𝑒𝑓𝑓nsubscript𝑒𝑓𝑓𝑛\mathit{eff}_{n}.
+
+
+
+
+
+𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑=∑i∈h​a​r​d​w​a​r​e​_​s​e​t(Pi⋅𝑒𝑓𝑓i⋅ni⋅ti)subscript𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑subscript𝑖ℎ𝑎𝑟𝑑𝑤𝑎𝑟𝑒_𝑠𝑒𝑡⋅subscript𝑃𝑖subscript𝑒𝑓𝑓𝑖subscript𝑛𝑖subscript𝑡𝑖\mathit{energy}_{\mathit{hard}}=\sum_{i\in hardware\_set}(P_{i}\cdot\mathit{eff}_{i}\cdot n_{i}\cdot t_{i})
+
+(8)
+
+
+
+
+
+
+𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟=𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑⋅𝑃𝑈𝐸subscript𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟⋅subscript𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑𝑃𝑈𝐸\mathit{energy}_{\mathit{oper}}=\mathit{energy}_{\mathit{hard}}\cdot\mathit{PUE}
+
+(9)
+
+
+
+
+
+
+4.6 Operational Carbon Model
+
+By using the FLOP count (𝑇𝐹𝐿𝑂𝑃𝑇𝐹𝐿𝑂𝑃\mathit{TFLOP}), the hardware efficiency (𝑒𝑓𝑓𝑒𝑓𝑓\mathit{eff}), and the computing device number (nd​e​vsubscript𝑛𝑑𝑒𝑣n_{dev}), we can determine the execution time of a device through Equation 7, where 𝐹𝐿𝑂𝑃𝑝𝑒𝑎𝑘subscript𝐹𝐿𝑂𝑃𝑝𝑒𝑎𝑘\mathit{FLOP}_{\mathit{peak}} represents the device peak throughput. The total energy (𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑subscript𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑\mathit{energy}_{\mathit{hard}}) consumed by all hardware units can be calculated using Equation 8, where Pisubscript𝑃𝑖P_{i} denotes the peak power of hardware unit i𝑖i; 𝑒𝑓𝑓isubscript𝑒𝑓𝑓𝑖\mathit{eff}_{i} represents the hardware efficiency of hardware unit i𝑖i; nisubscript𝑛𝑖n_{i} indicates the count of hardware unit i𝑖i; and tisubscript𝑡𝑖t_{i} means the execution time of hardware unit i𝑖i. Hardware units encompass a range of components, including CPUs, LLM computing devices, memories, SSDs, and others.
+
+
+
+
+
+CO2eq𝑜𝑝𝑒𝑟=𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟⋅𝑐𝑎𝑟𝑏​_​𝑖𝑛𝑡𝑒𝑛subscriptitalic-CO2eq𝑜𝑝𝑒𝑟⋅subscript𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟𝑐𝑎𝑟𝑏_𝑖𝑛𝑡𝑒𝑛\mathit{CO2eq}_{\mathit{oper}}=\mathit{energy}_{\mathit{oper}}\cdot\mathit{carb\_inten}
+
+(10)
+
+
+
+
+
+
+CO2eq𝑐ℎ𝑖𝑝=𝑎𝑟𝑒𝑎⋅𝐶𝑃𝐴subscriptitalic-CO2eq𝑐ℎ𝑖𝑝⋅𝑎𝑟𝑒𝑎𝐶𝑃𝐴\mathit{CO2eq}_{\mathit{chip}}=\mathit{area}\cdot\mathit{CPA}
+
+(11)
+
+
+
+
+PUE. Power Usage Effectiveness (PUE) (Henderson et al., 2020) serves as the industry standard metric for evaluating a data center’s energy efficiency. It is defined as the ratio of the total energy consumption of the data center, including all auxiliary components like cooling, to the energy consumed solely by the computing hardware within the data center. The operational energy (𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟subscript𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟\mathit{energy}_{\mathit{oper}}) associated with LLM processing can be calculated using Equation 9, where 𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑subscript𝑒𝑛𝑒𝑟𝑔𝑦ℎ𝑎𝑟𝑑\mathit{energy}_{\mathit{hard}} denotes the energy used by the computing hardware within a data center, and 𝑃𝑈𝐸𝑃𝑈𝐸\mathit{PUE} indicates the PUE of the specific data center.
+
+
+
+
+
+CO2eq𝑒𝑚𝑏=∑i∈h​a​r​d​w​a​r​e​_​s​e​tti⋅CO2eq𝑐ℎ𝑖𝑝i𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒isubscriptitalic-CO2eq𝑒𝑚𝑏subscript𝑖ℎ𝑎𝑟𝑑𝑤𝑎𝑟𝑒_𝑠𝑒𝑡⋅subscript𝑡𝑖subscriptitalic-CO2eqsubscript𝑐ℎ𝑖𝑝𝑖subscript𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒𝑖\mathit{CO2eq}_{\mathit{emb}}=\sum_{i\in hardware\_set}\frac{\mathit{t}_{i}\cdot\mathit{CO2eq}_{\mathit{chip}_{i}}}{\mathit{lifetime}_{i}}
+
+(12)
+
+
+
+
+
+
+CO2eq=CO2eq𝑜𝑝𝑒𝑟+CO2eq𝑒𝑚𝑏italic-CO2eqsubscriptitalic-CO2eq𝑜𝑝𝑒𝑟subscriptitalic-CO2eq𝑒𝑚𝑏\mathit{CO2eq}=\mathit{CO2eq}_{\mathit{oper}}+\mathit{CO2eq}_{\mathit{emb}}
+
+(13)
+
+
+
+
+
+
+
+Table 2: The data center efficiency.
+
+
+
+data
+carbon
+carbon
+
+
+center
+free
+intensity
+
+
+name
+energy
+gCO2eq/𝑘𝑊ℎitalic-gCO2eq𝑘𝑊ℎ\mathit{gCO2eq/kWh}
+
+
+
+
+asia-east2
+28%
+360
+
+
+europe-north1
+91%
+127
+
+
+us-central1
+97%
+394
+
+
+us-south1
+40%
+296
+
+
+
+
+
+
+
+Table 3: The comparison of embodied carbon footprints.
+
+
+
+hardware
+description
+unit
+CPA
+
+
+CPU
+TSMC 16nm
+147 m​m2𝑚superscript𝑚2mm^{2}
+
+1 kgCO2/𝑐𝑚2italic-kgCO2superscript𝑐𝑚2\mathit{kgCO2/cm^{2}}
+
+
+
+DRAM
+Micron 18nm
+256 GB
+0.4 kgCO2/𝐺𝐵italic-kgCO2𝐺𝐵\mathit{kgCO2/GB}
+
+
+
+SSD
+Samsung 20nm
+32 TB
+0.018kgCO2/𝐺𝐵italic-kgCO2𝐺𝐵\mathit{kgCO2/GB}
+
+
+
+TPUv3
+TSMC 16nm
+700 m​m2𝑚superscript𝑚2mm^{2}
+
+1 kgCO2/𝑐𝑚2italic-kgCO2superscript𝑐𝑚2\mathit{kgCO2/cm^{2}}
+
+
+
+TPUv4
+TSMC 7nm
+400 m​m2𝑚superscript𝑚2mm^{2}
+
+1.6 kgCO2/𝑐𝑚2italic-kgCO2superscript𝑐𝑚2\mathit{kgCO2/cm^{2}}
+
+
+
+V100
+TSMC 12nm
+815 m​m2𝑚superscript𝑚2mm^{2}
+
+1.2 kgCO2/𝑐𝑚2italic-kgCO2superscript𝑐𝑚2\mathit{kgCO2/cm^{2}}
+
+
+
+H100
+TSMC 4nm
+814 m​m2𝑚superscript𝑚2mm^{2}
+
+1.8 kgCO2/𝑐𝑚2italic-kgCO2superscript𝑐𝑚2\mathit{kgCO2/cm^{2}}
+
+
+
+
+
+
+
+
+
+Carbon Intensity. Carbon intensity is a metric that assesses the environmental impact of a data center’s energy consumption. Carbon-free energy (CFE) denotes the proportion of renewable, carbon-free energy utilized within a data center. As a data center increases its utilization of renewable energy, it experiences an increase in CFE and a corresponding decrease in carbon intensity. Table 3 provides insights into the carbon intensity and CFE values for some data centers. The operational carbon footprint (CO2eq𝑜𝑝𝑒𝑟subscriptitalic-CO2eq𝑜𝑝𝑒𝑟\mathit{CO2eq}_{\mathit{oper}}) attributed to LLM processing is calculated using Equation 10, where 𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟subscript𝑒𝑛𝑒𝑟𝑔𝑦𝑜𝑝𝑒𝑟\mathit{energy}_{\mathit{oper}} represents the operational energy for LLM processing, and 𝑐𝑎𝑟𝑏​_​𝑖𝑛𝑡𝑒𝑛𝑐𝑎𝑟𝑏_𝑖𝑛𝑡𝑒𝑛\mathit{carb\_inten} denotes the carbon intensity of the specific data center.
+
+
+
+
+4.7 Embodied Carbon Model
+
+To quantify the chip’s embodied carbon footprint (CO2eq𝑐ℎ𝑖𝑝subscriptitalic-CO2eq𝑐ℎ𝑖𝑝\mathit{CO2eq}_{\mathit{chip}}) within a specific hardware unit, Equation 11 is employed, where 𝑎𝑟𝑒𝑎𝑎𝑟𝑒𝑎\mathit{area} represents the chip’s area. The Carbon emitted Per unit Area (𝐶𝑃𝐴𝐶𝑃𝐴\mathit{CPA}) is contingent on various semiconductor fabrication parameters, including yield, energy consumption per unit area during manufacturing, emissions from chemicals utilized in hardware production, and emissions associated with raw material sourcing for fabrication. Specific values for area and CPA for distinct hardware units are elaborated in Table 3, where area values for CPU, DRAM, SSD, TPU, and GPU are drawn from sources such as (Singh et al., 2020), (Choe, 2021), (Wiki, 2023b), and (Wiki, 2023a). CPA values for Micron, Samsung, and TSMC are extracted from (Garcia Bardon et al., 2020), and (TSMC, 2019). The total embodied carbon footprint (CO2eq𝑒𝑚𝑏subscriptitalic-CO2eq𝑒𝑚𝑏\mathit{CO2eq}_{\mathit{emb}}) originating from all hardware units involved in LLM processing is assessed using Equation 12, where CO2eq𝑐ℎ𝑖𝑝isubscriptitalic-CO2eqsubscript𝑐ℎ𝑖𝑝𝑖\mathit{CO2eq}_{\mathit{chip}_{i}} denotes the chip’s embodied carbon footprint for hardware unit i𝑖i, 𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒isubscript𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒𝑖\mathit{lifetime}_{i} means the lifespan of hardware unit i𝑖i, and tisubscript𝑡𝑖t_{i} represents the execution duration of hardware unit i𝑖i. The hardware units mentioned in Equation 12 include CPUs, LLM computing devices, memories, SSDs, and other components. Notably, Meta’s data centers achieve an average utilization rate of 60%percent6060\% throughout the 5-year lifespan of hardware units (Wu et al., 2022).
+
+
+
+
+4.8 Total Carbon Footprint
+
+The total carbon footprint (CO2eqitalic-CO2eq\mathit{CO2eq}) resulting from LLM processing is determined using Equation 13, where CO2eq𝑜𝑝𝑒𝑟subscriptitalic-CO2eq𝑜𝑝𝑒𝑟\mathit{CO2eq}_{\mathit{oper}} indicates the operational carbon footprint of the LLM, and CO2eq𝑒𝑚𝑏subscriptitalic-CO2eq𝑒𝑚𝑏\mathit{CO2eq}_{\mathit{emb}} denotes the embodied carbon footprint of the LLM.
+
+
+
+
+
+
+5 Validation
+
+We employ LLMCarbon to compute the operational footprints of five LLMs, including dense and MoE architectures, developed by Google, OpenAI, and Meta during their training phases. We also compute the operational footprint of another LLM, Noor (Lakim et al., 2022), during its storage phase. To validate the predictions of LLMCarbon, we compare our calculated operational footprint values with the previously published data for these LLMs. Moreover, we utilize LLMCarbon to predict the embodied footprint of an LLM developed by Meta and validate the result by comparing it with the actual embodied footprint data.
+
+
+Table 4: The validation on the operational carbon footprints of various LLMs.
+
+
+
+LLM
+T5
+GPT3
+GShard
+Switch
+XLM
+
+
+reference
+(Patterson et al., 2021)
+(Wu et al., 2022)
+
+
+developer
+Google
+OpenAI
+Google
+Google
+Meta
+
+
+type
+dense
+dense
+MoE
+MoE
+dense
+
+
+parameter # (B)
+11
+175
+619
+1500
+0.55
+
+
+base model param. # (B)
+-
+-
+2.3
+7.41
+-
+
+
+token # (B)
+500
+300
+1K
+2K
+7K
+
+
+𝐶𝑂2​𝑒𝑞/𝐾𝑊ℎsubscript𝐶𝑂2𝑒𝑞𝐾𝑊ℎ\mathit{CO}_{2}\mathit{eq/KWh}
+0.545
+0.429
+0.177
+0.33
+0.413
+
+
+PUE
+1.12
+1.1
+1.09
+1.1
+1.1
+
+
+computing device
+TPUv3
+V100
+TPUv3
+TPUv3
+V100
+
+
+device TPD (W)
+450
+300
+450
+450
+300
+
+
+avg. system power (W)
+310
+330
+288
+245
+342
+
+
+peak TFLOPs/s
+123
+125
+123
+123
+125
+
+
+achieved TFLOPs/s
+45.6
+24.6
+48
+34.4
+26.5
+
+
+hardware efficiency
+37%
+19.7%
+39%
+28%
+21.2%
+
+
+device #
+512
+10K
+1K
+1K
+512
+
+
+total zettaFLOPs
+40.5
+314
+13.3
+82.2
+23.9
+
+
+training days
+20
+14.8
+3.1
+27
+20.4
+
+
+actual 𝑡𝐶𝑂2​𝑒𝑞subscript𝑡𝐶𝑂2𝑒𝑞\mathit{tCO}_{2}\mathit{eq}
+
+46.7
+552.1
+4.3
+59.1
+39
+
+
+mlco2 predicted 𝑡𝐶𝑂2​𝑒𝑞subscript𝑡𝐶𝑂2𝑒𝑞\mathit{tCO}_{2}\mathit{eq}
+
+89.4
+955.2
+8.4
+137.3
+66.96
+
+
+mlco2 ΔΔ\Delta
+
++91.3%percent91.3+91.3\%
++73%percent73+73\%
++95.3%percent95.3+95.3\%
++132%percent132+132\%
++69%percent69+69\%
+
+
+
+LLMCarbon predicted 𝑡𝐶𝑂𝟐​𝑒𝑞subscript𝑡𝐶𝑂2𝑒𝑞\mathbf{\mathit{tCO}_{2}\mathit{eq}}
+
+45.66
+553.87
+4.46
+63.9
+37.6
+
+
+𝐋𝐋𝐌𝐂𝐚𝐫𝐛𝐨𝐧​𝚫𝐋𝐋𝐌𝐂𝐚𝐫𝐛𝐨𝐧𝚫\mathbf{LLMCarbon~{}\Delta}
+−2.22%percent2.22\mathbf{-2.22\%}
++0.32%percent0.32\mathbf{+0.32\%}
++3.8%percent3.8\mathbf{+3.8\%}
++8.2%percent8.2\mathbf{+8.2\%}
+−3.54%percent3.54\mathbf{-3.54\%}
+
+
+
+
+
+
+5.1 Operational Carbon Footprint Validation
+
+Training Phase. Table 4 presents the validation results of LLMCarbon’s predictions on the training operational carbon footprint. To validate the training operational carbon footprint estimations yielded by LLMCarbon, we selected five LLMs: T5 (Raffel et al., 2020), GPT-3 (Brown et al., 2020), GShard (Lepikhin et al., 2021), Switch (Fedus et al., 2022), and XLM (Conneau et al., 2020). We list the inputs and outputs of LLMCarbon in Table 4. Within the table, “device TPD (W)” indicates the Chip Thermal Design Power of a computing device, while “avg. system power (W)” conveys the average system power per computing device, including TPU/GPU, host CPU, DRAM, and network interface. The inputs on the parameters of LLMs, hardware, and data centers, and the actual training operational carbon footprint values of these LLMs were collected from (Patterson et al., 2021) and (Wu et al., 2022). Since the parameter count of an LLM is considered as an architectural parameter of the LLM in (Patterson et al., 2021) and (Wu et al., 2022), we skipped the parameter model and directly used the parameter count as an input to LLMCarbon. The validation of the parameter model of LLMCarbon can be found in Appendix B. Owing to the adoption of suboptimal parallelism settings, the hardware efficiencies for training these LLMs hover within the range of 39%percent3939\% to 19.7%percent19.719.7\%, lower than the hardware efficiencies achieved with optimal parallelism configurations. Comparing the predicted operational carbon footprints to actual data, LLMCarbon’s projections display disparities of ≤8.2%absentpercent8.2\leq 8.2\%. When predicting the operational carbon footprint during the training of MoE LLMs, LLMCarbon incurs a higher margin of error, due to the intricacy of MoE architectures. On the contrary, when compared to actual data, the training operational carbon footprint estimations made by mlco2 (Lacoste et al., 2019) suffer from huge disparities of more than 69%percent6969\%, because mlco2 assumes all devices consistently operate at the peak computing throughput and consume the peak power.
+
+
+Inference Phase. To validate the operational carbon footprint predictions generated by LLMCarbon, we consider the inferences of GPT3 with 175B parameters (Yu et al., 2022). These inferences were carried out on 16 A100 GPUs, using a batch size of 32 and an input size of 128 tokens (Yu et al., 2022). According to the hardware efficiency model, this specific hardware configuration yields a hardware efficiency of 9.26%. Achieving the optimal hardware efficiency for GPT3 requires ∼similar-to\sim1.5K GPUs, which is significantly more than what was used for these inferences. LLMCarbon’s predicted latency for this inference batch is 3.1s, while the actual latency for this inference batch is 3s (Yu et al., 2022). We assume the inference experiments took place in a data center with a PUE of 1.1 and a carbon intensity of 0.429 𝐶𝑂2​𝑒𝑞/𝐾𝑊ℎsubscript𝐶𝑂2𝑒𝑞𝐾𝑊ℎ\mathit{CO}_{2}\mathit{eq/KWh}. The difference between the predicted and actual inference operational carbon footprints does not exceed +3.3%percent3.3+3.3\%.
+
+
+Storage Phase. The typical power consumption of cloud storage is reported as 11.3W/TB (Posani et al., 2018), while the power consumption for data transfer within a data center is around 1.48W/TB (Baliga et al., 2011). Over a six-month storage phase, the Noor LLM (Lakim et al., 2022) encompasses 32.7TB of storage data, comprising curated data, bulk data, and the model. Additionally, it transfers a data volume of 277.4TB. Based on LLMCarbon’s estimations, the storage data energy is predicted as 1.596MWh (compared to the actual 1.69MWh (Lakim et al., 2022)), while the energy consumption attributed to data transfer is projected to be 1.77MWh (compared to 1.8MWh (Lakim et al., 2022)). Notably, the projection accuracy of LLMCarbon regarding the operational energy during the storage phase showcases an error margin of less than 3.6%.
+
+
+Experimentation Phase. The experimentation phase consisting of various activities of training, inference, and storage (Wu et al., 2022). And we have validated the training phase, inference phase, and storage phase of an LLM in previous sections.
+
+
+
+
+5.2 Embodied Carbon Footprint Validation
+
+Table 5: The embodied carbon footprint validation against Meta XLM.
+
+
+
+hardware
+number
+CO2eq𝑐ℎ𝑖𝑝subscriptitalic-CO2eq𝑐ℎ𝑖𝑝\mathit{CO2eq}_{\mathit{chip}}
+t​i​m​el​i​f​e​t​i​m​e𝑡𝑖𝑚𝑒𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒\frac{time}{lifetime}
+CO2eq𝑒𝑚𝑏subscriptitalic-CO2eq𝑒𝑚𝑏\mathit{CO2eq}_{\mathit{emb}}
+
+
+(𝑘𝑔𝐶𝑂𝟐​𝑒𝑞subscript𝑘𝑔𝐶𝑂2𝑒𝑞\mathbf{\mathit{kgCO}_{2}\mathit{eq}})
+(𝑡𝐶𝑂𝟐​𝑒𝑞subscript𝑡𝐶𝑂2𝑒𝑞\mathbf{\mathit{tCO}_{2}\mathit{eq}})
+
+
+GPU
+512
+9.78
+1.12%
+0.056
+
+
+CPU
+64
+1.47
+1.12%
+0.0018
+
+
+SSD
+64
+576
+1.12%
+0.412
+
+
+DRAM
+64
+102.4
+1.12%
+0.073
+
+
+others
+64
+148.2
+1.12%
+0.096
+
+
+predicted sum
+
+
+0.64
+
+
+
+
+actual 0.66 𝑡𝐶𝑂𝟐​𝑒𝑞subscript𝑡𝐶𝑂2𝑒𝑞\mathbf{\mathit{tCO}_{2}\mathit{eq}}, 𝚫𝚫\mathbf{\Delta} −3.05%percent3.05\mathbf{-3.05\%}
+
+
+
+
+
+
+Table 5 presents the validation results of the embodied carbon footprint estimated by LLMCarbon in comparison to the published data of XLM (Wu et al., 2022). This is the only publicly available data regarding the embodied carbon footprint of a LLM training hardware infrastructure to our best knowledge. The setup consists of 512 V100 GPUs organized into 64 8-GPU servers, each equipped with a CPU, a 32TB SSD disk, and a 256GB DRAM main memory system. Using the unit and CPA data from Table 3, we computed the values of CO2eq𝑐ℎ𝑖𝑝subscriptitalic-CO2eq𝑐ℎ𝑖𝑝\mathit{CO2eq}_{\mathit{chip}} presented in Table 5. The training duration of XLM is 20.4 days, and Wu et al. (2022) assumed a hardware unit lifetime of 5 years. Consequently, the t​i​m​el​i​f​e​t​i​m​e𝑡𝑖𝑚𝑒𝑙𝑖𝑓𝑒𝑡𝑖𝑚𝑒\frac{time}{lifetime} values for all hardware units were determined to be 1.12%percent1.121.12\%. Apart from CPU, GPU, SSD, and DRAM, other hardware components (others) such as the motherboard, chassis, and PSU collectively contribute to 15%percent1515\% (Tannu & Nair, 2022) of the anticipated total embodied carbon footprint. In contrast to the reported embodied carbon footprint of XLM (Wu et al., 2022), the predictions produced by LLMCarbon reveal a disparity of −3.05%percent3.05-3.05\%.
+
+
+
+
+
+Figure 6: The carbon footprint of three LLMs in case studies.
+
+
+
+
+Figure 7: The carbon footprint of GPT3 trained by different computing devices.
+
+
+
+
+
+
+
+
+
+6 Case Studies Using LLMCarbon
+
+We used LLMCarbon to demonstrate the following case studies.
+
+
+Large Embodied Carbon Footprint. The embodied carbon footprint throughout the life-cycle of an LLM is significant. Even when no computing activities occur, the LLM still incurs embodied carbon overhead due to the idle hardware allocated to the LLM. As illustrated in Figure 7, the embodied carbon footprint of an LLM across its entire life-cycle contributes to approximately 24%∼35%similar-topercent24percent3524\%\sim 35\% of the overall carbon footprint (including embodied, training, inference, experimentation, and storage carbon footprints) of the LLM. We adopted the ratio between training, inference, and experimentation activities from (Wu et al., 2022). Furthermore, as data centers progressively shift towards adopting renewable energy sources, the embodied carbon footprint of an LLM will dominate the entire life-cycle carbon footprint of the LLM in the near future. For instance, 97% of the operational energy in a Meta data center (Wu et al., 2022) is provided by renewable sources. The embodied carbon footprints of diverse LLMs operating within this data center constitute 92%∼95%similar-topercent92percent9592\%\sim 95\% of their entire life-cycle carbon footprints. This underscores the pivotal role of accounting for embodied carbon in the sustainability evaluation of LLMs.
+
+
+Optimal Parallelism Setting. As discussed in Section 5.1, the training processes of the LLMs used in our validation lacked optimized parallelism settings. By using LLMCarbon, we pinpoint the optimal configurations for data, tensor, pipeline, and expert parallelism pertaining to these three LLMs. As illustrated in Figure 7, the adoption of these optimal parallelism settings leads to a noteworthy decrease (i.e., 16%∼39%similar-topercent16percent3916\%\sim 39\%) in their operational carbon footprints.
+
+
+New Accelerators. When employing distinctive computing devices for the LLM processing, the operational carbon footprints of an LLM tend to differ, while the embodied carbon footprints remain similar. Figure 7 showcases the outcomes derived from training, inferring, and experimenting with three LLMs utilizing V100 GPU, H100 GPU, TPUv3, and TPUv4. Their embodied carbon footprints exhibit similarity, as the embodied carbon emissions of SSD and DRAM dominate their total embodied carbon footprints. However, compared to V100 GPUs, the operational carbon footprints of these LLMs are notably curtailed by 71% and 41% when employing H100 and TPUv4 accelerators, respectively. Embracing novel computing devices for LLMs presents a pragmatic path to mitigate their operational carbon footprints.
+
+
+Figure 8: The trade-off between training carbon footprint and test loss.
+
+
+Training Carbon Footprint Scaling. In addition to the LLMs (i.e., T5, GPT3, GShard, Switch, XLM, and Noor) we used in validations, we also included other LLMs in our analysis, such as PaLM (Chowdhery et al., 2022), Gopher (Rae et al., 2021), Chinchilla (Hoffmann et al., 2022), LaMDA (Thoppilan et al., 2022), Jurassic-1 (Lieber et al., 2021), MT-NLG (Smith et al., 2022), Bloom (Scao et al., 2022), YaLM (Yandex, 2022), GLM (Zeng et al., 2023), GLaM (Du et al., 2022), FB-MoE (Artetxe et al., 2021), ST-MoE (Zoph et al., 2022), and PR-MoE (Rajbhandari et al., 2022). Among these LLMs, GShard, Switch, GLaM, FB-MoE, ST-MoE, and PR-MoE use sparse MoE architectures, while the other LLMs adopt dense architectures. We do not aim to directly compare the accuracy and carbon emissions of these original LLMs, since they were trained by different datasets and in different data centers. Instead, we study the test losses and training operational carbon footprints of some new LLM designs adopting the same architectures as these LLMs. We assume these new LLM designs are trained using the same dataset and the same hardware infrastructure in the same data center. We present the test losses and training operational carbon footprints of these LLMs in Figure 8. To compute the test loss, we adopt the fitting constants including α=0.34𝛼0.34\alpha=0.34, β=0.28𝛽0.28\beta=0.28, A=406.4𝐴406.4A=406.4, B=410.7𝐵410.7B=410.7, and E=1.69𝐸1.69E=1.69 for Equation 3 from (Hoffmann et al., 2022). Since the test loss of an MoE LLM with P𝑃P parameters is similar to that of its dense counterpart with only P/8𝑃8P/8 parameters (Rajbhandari et al., 2022), we decreased the P𝑃P of MoE LLMs to P/8𝑃8P/8 in Equation 3. The training processes of all LLMs use their optimal parallelism settings and the corresponding numbers of V100 GPUs hosted by a data center where PUE is 1.1 and 𝐶𝑂2​𝑒𝑞/𝐾𝑊ℎsubscript𝐶𝑂2𝑒𝑞𝐾𝑊ℎ\mathit{CO}_{2}\mathit{eq/KWh} is 0.431. Overall, an LLM with a larger number of parameters and trained on more tokens achieves a lower test loss but also consumes a larger training operational carbon footprint. Compared to dense LLMs, the Pareto front of MoE LLMs is closer to the origin point, indicating that an MoE LLM can obtain a lower test loss by the same training carbon footprint.
+
+
+
+
+
+7 Conclusion
+
+In this paper, we propose LLMCarbon, an end-to-end carbon footprint modeling tool for dense and MoE LLMs, which contribute significantly to carbon emissions during training, inference, experimentation, and storage processes. LLMCarbon can accurately assess the operational and embodied carbon footprints of an LLM, enabling efficient exploration of the design space by considering the trade-off between carbon footprint and test loss. It also promotes the adoption of carbon footprint reduction measures by facilitating quantitative comparisons among various LLM configurations.

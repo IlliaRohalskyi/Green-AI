@@ -1,0 +1,987 @@
+Abstract:
+
+Abstract.
+Recent years have seen a surge in the popularity of commercial AI products based on generative, multi-purpose AI systems promising a unified approach to building machine learning (ML) models into technology. However, this ambition of “generality” comes at a steep cost to the environment, given the amount of energy these systems require and the amount of carbon that they emit. In this work, we propose the first systematic comparison of the ongoing inference cost of various categories of ML systems, covering both task-specific (i.e. finetuned models that carry out a single task) and ‘general-purpose’ models, (i.e. those trained for multiple tasks). We measure deployment cost as the amount of energy and carbon required to perform 1,000 inferences on representative benchmark dataset using these models. We find that multi-purpose, generative architectures are orders of magnitude more expensive than task-specific systems for a variety of tasks, even when controlling for the number of model parameters. We conclude with a discussion around the current trend of deploying multi-purpose generative ML systems, and caution that their utility should be more intentionally weighed against increased costs in terms of energy and emissions. All the data from our study can be accessed via an interactive demo to carry out further exploration and analysis.
+
+
+
+
+1. Introduction
+
+Understanding the environmental impacts of different industries is an important first step towards developing effective strategies to mitigate those impacts. For newer industries such as information and communication technologies (ICT) of which Artificial Intelligence (AI) and Machine Learning (ML) are considered to be a part of, more work is needed to understand the extent of their environmental impacts and the factors that influence it. Between 2017 and 2021, the electricity used by Meta, Amazon, Microsoft, and Google, the main providers of commercially-available cloud compute, more than doubled  (International Energy Authority, 2023). According to the most recent figures available, global data centre electricity consumption has grown by 20-40% annually in recent years, reaching 1-1.3% of global electricity demand and contributing 1% of energy-related greenhouse gas emissions in 2022 (Hintemann and Hinterholzer, 2022). However the contribution of the AI sector specifically towards these figures is unclear.
+
+
+Recent work documenting the environmental impacts of ML has focused largely on quantifying the operational energy and carbon required to perform the training phase of the ML model life cycle (Strubell et al., 2019; Patterson et al., 2021; Dodge et al., 2022; Luccioni and Hernandez-Garcia, 2023) due to the relative ease of measuring per-model energy use for that phase and the impressive quantity of energy required to perform a single training run (Strubell et al., 2019; Patterson et al., 2021). Yet, other phases of the ML model life cycle, such as inference, stand to impact the environment just as much, or more, than training due to the computational resources required to deploy modern models at scale. While inference on a single example requires much less computation than that required to train the same model, inference happens far more frequently than model training — as many as billions of times a day for a model powering a popular user-facing product such as Google Translate.111Google reported translating more than 100 billion words per day in 2016, assuming an average query length of 100 words yields an estimate of 1 billion queries to the model per day. Source: https://blog.google/products/translate/ten-years-of-google-translate/ Yet, in-depth work quantifying the costs of model inference and deployment is limited and their environmental impacts, in terms of energy and carbon as well as water and mining of rare earth minerals, have yet to be estimated. According to AWS, the largest global cloud provider, inference is estimated to make up 80 to 90% of total ML cloud computing demand (Barr, 2019; Leopold, 2019), whereas a 2021 publication by Meta attributed approximately one-third of their internal end-to-end ML carbon footprint to model inference, with the remainder produced by data management, storage, and training (Wu et al., 2021); similarly, a 2022 study from Google attributed 60% of its ML energy use to inference, compared to 40% for training (Patterson et al., 2022). Given the increasing ubiquity of AI model deployment, it is crucial to go beyond these high-level statistics to get a better idea of the energy requirements and carbon emissions of model inference for different models and tasks.
+In particular, looking at inference rather than training leads to drastically different conclusions when considering the multi-purpose (or “general-purpose”) aspect specifically. Training a single model for multiple tasks can indeed be more energy-efficient when considering training costs only, but these gains can easily be lost and even reversed over the course of the model’s lifetime, given how much inference is carried out when these models are deployed in user-facing applications like chat and web search.
+
+
+To help shed light on this issue, we perform an extensive study measuring the amount of energy required to deploy various ML models and architectures, including large language models (LLMs)- as such, our study is, to our knowledge, the first to focus solely on the inference phase of the ML model life cycle. We study 88 models across 10 tasks and 30 datasets, spanning applications in natural language and computer vision, analyzing the impact of end task, modality, model size, architecture, and learning paradigm (i.e. task-specific or multi-task/multi-purpose) on energy efficiency. We identify orders-of-magnitude differences in the amount of energy required per inference across models, modalities and tasks and shine light on an important trade-off between the benefit of multi-purpose systems, their energy cost, and ensuing carbon emissions.
+By painting a more detailed picture of widely varying energy requirements for ML model inference, we hope this study can be useful for practitioners to better understand accuracy-efficiency trade-offs across tasks and models, as well as enabling better estimates, and projections and policy decisions at the sector level.
+
+
+
+
+
+2. Previous Work
+
+Estimating the energy and emissions of ML models has remains a relatively under-explored topic, albeit one that has been gathering traction since Strubell et al’s seminal article quantifying the energy and carbon emissions of a variety of then-large NLP models (2019). Since then, most studies have focused on estimating the energy consumed and carbon emitted during the training phase of neural networks – this includes studies by Patterson et al. (2021; 2022), who compared different models and analyzed factors influencing their emissions. There have also been studies of specific model architectures, e.g. BLOOM (Luccioni et al., 2022) and Nour (Lakim et al., 2022), which carried out in-depth analyses of the different steps in the models’ life cycle and their relative contribution towards the final quantity of carbon emissions.
+Given the increasing deployment of ML models in the cloud, several studies have therefore looked at cloud-specific ways to reduce the emissions of ML models such as delayed scheduling, workload elasticity and choosing the least carbon-intensive electricity available Dodge et al. (2022); Hanafy et al. (2023); Chien et al. (2023).
+
+
+Despite these empirical studies, there is currently a lack of standardized methodology for quantifying and comparing the energy consumption and carbon emissions of ML models. There are several tools that exist, such as Code Carbon (Schmidt et al., 2021), MLCO2 (Lacoste et al., 2019) and LLMCarbon (Faiz et al., 2023), all of which adopt different approaches and output different results (see (Bannour et al., 2021) for a detailed comparison). It is therefore difficult to systematically compare the carbon footprints of different models. Existing tools and studies have also largely focused on the dynamic power consumption (i.e. the electricity necessary for powering hardware) and its resulting emissions. However, there have been several proposals to also take into account the embodied emissions of ML models (i.e. the emissions that can be attributed to the manufacturing of computing equipment) into carbon emissions estimates. This has been impeded by a lack of transparency from the designers of common computing hardware such as GPUs, although recent estimates have revealed that the embodied carbon footprint of a large language model (LLM) trained and deployed on Meta’s compute cluster constitutes up to 50% of its carbon footprint (Wu et al., 2021).
+While the majority of existing work has been focused on ML model training given that it is a more tractable part of the model life cycle (i.e. it is most often carried out over a set period of time on a specific compute instance), model inference has started to also become the subject of scholarship (Desislavov et al., 2021; Chien et al., 2023). Luccioni et al.’s study of BLOOM was the first of its kind to look at the specific energy costs related to deploying an LLM (Luccioni et al., 2022) and found that, over time, this can represent a significant portion of a model’s overall carbon footprint.
+
+
+The current study further pursues this line of work, delving deeper into the inference stage of ML models, the energy it consumes and the carbon it emits. By testing a variety of architectures on different tasks and datasets, we aim to gain a better understanding of the degree of variance that can be observed and how seemingly small user choices can result in large differences in model’s environmental impacts.
+
+
+
+
+
+3. Methodology
+
+As stated above, our study focuses on the inference (i.e. deployment) stage in the model life cycle, aiming to address the knowledge gaps that currently exist with regards to its energy consumption and ensuing emissions. We describe how we chose the tasks, datasets and models in the sections below, and present the results of our analysis in Section 4.
+
+
+
+3.1. Task and dataset selection
+
+As the starting point of our study, we chose ten ML tasks from 5 different modalities : Text-to-category (text classification, token classification, extractive question answering), Text-to-text (masked language modeling, text generation, summarization), Image-to-category (image classification, object detection), Image-to-text (image captioning) and Text-to-image (image generation). These tasks were chosen because they are common in both Natural Language Processing and Computer Vision, allowing us to explore multiple modalities, and include several multimodal tasks (i.e. image captioning and image generation), allowing us to explore the nexus between several modalities as well.
+To test each of the tasks listed above, we chose three of the most downloaded datasets from the Hugging Face Hub. We present the tasks and their corresponding datasets in Table 1.
+
+
+
+
+
+Task
+Datasets
+Task
+Datasets
+
+
+
+
+
+
+
+image
+
+
+classification
+
+
+
+
+
+
+CIFAR 10 (Krizhevsky, 2009)
+
+
+
+CIFAR 100 (Krizhevsky, 2009)
+
+
+
+ImageNet 1K (Russakovsky et al., 2015)
+
+
+
+
+
+
+
+question
+
+
+answering
+
+
+
+
+
+
+SQuAD(Rajpurkar et al., 2016)
+
+
+
+SQuAD v2 (Rajpurkar et al., 2018)
+
+
+
+SciQ (Johannes Welbl, 2017)
+
+
+
+
+
+
+
+
+
+image
+
+
+captioning
+
+
+
+
+
+
+Visual Genome (Krishna et al., 2017)
+
+
+
+RedCaps (Desai et al., 2021)
+
+
+
+COCO (Lin et al., 2014)
+
+
+
+
+summarization
+
+
+
+SAMSum (Gliwa et al., 2019)
+
+
+
+CNN-Daily Mail (Hermann et al., 2015)
+
+
+
+XSum (Narayan et al., 2018)
+
+
+
+
+
+
+
+
+
+image
+
+
+generation
+
+
+
+
+
+
+DiffusionDB (Wang et al., 2022)
+
+
+
+ImageReward (Xu et al., 2023)
+
+
+
+SD Prompts (Santana, 2023)
+
+
+
+
+
+
+
+text
+
+
+classification
+
+
+
+
+
+
+IMDB (Maas et al., 2011)
+
+
+
+Rotten Tomatoes (Pang and Lee, 2005)
+
+
+
+SST 2 (Socher et al., 2013)
+
+
+
+
+
+
+
+
+
+masked
+
+
+language
+
+
+modeling
+
+
+
+
+
+
+BookCorpus (Zhu et al., 2015)
+
+
+
+C4 (Raffel et al., 2019)
+
+
+
+OSCAR (Ortiz Su’arez et al., 2019)
+
+
+
+
+
+
+
+text
+
+
+generation
+
+
+
+
+
+
+WikiText (Merity et al., 2016)
+
+
+
+BookCorpus (Zhu et al., 2015)
+
+
+
+OSCAR (Ortiz Su’arez et al., 2019)
+
+
+
+
+
+
+
+
+
+object
+
+
+detection
+
+
+
+
+
+
+Visual Genome (Krishna et al., 2017)
+
+
+
+CPPE-5 (Dagli and Shaikh, 2021)
+
+
+
+COCO (Lin et al., 2014)
+
+
+
+
+
+
+
+token
+
+
+classification
+
+
+
+
+
+
+ReCoRD (Wang et al., 2019)
+
+
+
+WikiANN (Pan et al., 2017)
+
+
+
+CoNLL 2003 (Tjong Kim Sang and De Meulder, 2003)
+
+
+
+
+
+
+
+Table 1. A list of the tasks and datasets used in our study.
+
+
+
+
+3.2. Models
+
+To be representative of a broad diversity of deployment use cases, we sampled 88 models, some of which were trained or finetuned specifically for the tasks that we selected, whereas others were designed to be used as zero-shot or multi-task models, to allow comparisons both for different architectures on a given task and between tasks for the same architecture.
+
+
+Task-specific Models.
+
+For all of the tasks listed above, we selected the 8 most popular models from the HuggingFace Hub (by number of downloads) 222We were obliged to discard some models, e.g. if they were trained on another language or if the specific task they were fine-tuned for was not compatible with any of the datasets selected. - we present the full list of model identifiers in Table 6 in the Supplementary Materials. For each model, we ran 1,000 inferences for each of the 3 datasets from the task it was trained for (listed in Table 1), using the Transformers (Wolf et al., 2019) library. We ran each set of inferences 10 times to ensure statistical significance of our measurements. We set up the inferences sequentially – i.e., without batching – in order to reflect the variability of model deployment in situ, which can make it difficult to batch model inputs.
+
+
+
+Multi-Purpose Models.
+
+In addition to the task-specific models listed above, we also selected 8 multi-purpose models to analyze on different tasks – models that were specifically trained to perform well in various different application settings. We chose 4 sequence-to-sequence models of different sizes from the Flan-T5 family (Chung et al., 2022) (base, large, xl and xxl) and 4 decoder-only models from the BLOOMz family (Muennighoff et al., 2022): BLOOMz-560M, BLOOMz-1B, BLOOMz-3B and BLOOMz-7B. We tested these on a subset of the tasks to allow a comparison of multi-purpose generative models with individual task-specific systems in terms of their energy consumption and emissions: question answering, text classification and summarization. We selected these three tasks because we were able to find a set of models that were capable of carrying them out with a unified model architecture (which wasn’t possible for all tasks, especially one that involved multiple modalities.) We prompted these 8 models in a zero-shot setting that was constant across models, e.g. ”Summarize the following text: [text]. Summary:” on the same 1,000 samples as the fine-tuned models, also repeating each experiment ten times to measure the significance of results.
+
+
+We ran all of our experiments on a single NVIDIA A100-SXM4-80GB GPU hosted on Amazon Web Services, and used the Code Carbon package (Schmidt et al., 2021) to measure both the energy consumed and the carbon emitted during inference.
+Given that all of our experiments were run in the same compute region (AWS’s us-west-2), which is based in Oregon and has an average carbon intensity of 297.6 grams of C​O2𝐶subscript𝑂2CO_{2}eq per kWh333The carbon intensity of an energy grid is measured in C​O2𝐶subscript𝑂2CO_{2}eq, and not in C​O2𝐶subscript𝑂2CO_{2} specifically, because the different greenhouse gases that are generated during electricity generation are reduced to a common denominator, that of carbon dioxide, or C​O2𝐶subscript𝑂2CO_{2}. For a more in-depth discussion of how this is done, see Luccioni and Hernandez-Garcia (2023)., this means that both the energy consumed during inference and the carbon emitted are correlated; we will therefore plot one or the other depending on which aspect of our results we are discussing. While the energy consumed during inference will remain similar for models deployed on A100 GPUs in other compute regions, the carbon emissions will vary depending on the source of energy used in the region – it is therefore helpful to report both energy and carbon separately to allow for meaningful comparisons across regions and hardware.
+We provide all the code used for our experiments in our GitHub repository, alongside the logs produced by Code Carbon, which not only provides the total energy consumed but also a more fine-grained breakdown by hardware component (GPU, CPU and RAM), which can be used to carry out further analyses. In total, for all of model experimentation and evaluation, we used a total of 754.66 kWh of energy and emitted 178.97 kg of C​O2𝐶subscript𝑂2CO_{2}.
+
+
+
+
+
+
+
+4. Results
+
+We present our results in the subsections below: in Section 4.1, we analyze the range of energy used and carbon emitted for each task for task-specific models. In Section 4.2, we shift our focus to multi-purpose (i.e. ‘zero-shot‘ models), looking at the variation between different sizes and architectures of multi-purpose models and the difference in the energy consumption and emissions between task-specific and multi-purpose models. In Section 4.3, we carry out a comparison between model training and inference costs for models of different sizes, calculating when parity is reached.
+
+
+
+4.1. Task-specific model analysis
+
+We start by analyzing the degree of variability in terms of the energy cost of ML models specifically trained for a variety of tasks. Table 2 shows each of the ten tasks that we analyzed as well as the mean energy used across all models for 1,000 inferences and its standard deviation. We can see that classification tasks for both images and text are on the lower end of the spectrum in terms of emissions (ranging between 0.002 and 0.007 kWh for 1,000 inferences), whereas generative tasks such as text generation and summarization use, on average, over 10 times more energy for the same number of inferences (around 0.05 kWh hours for 1,000 inferences), and multimodal tasks such as image captioning and image generation are on the highest end of the spectrum (0.06-2.9 kWh hours for 1,000 inferences). Text-based tasks are, all things considered, more energy-efficient than image-based tasks, with image classification requiring less energy (median of 0.0068 kWh for 1,000 inferences) than image generation (1.35 kWh) and, conversely, text generation (0.042 KwH) requiring more than text classification (0.0023 kWh). For comparison, charging the average smartphone requires 0.012 kWh of energy 444See https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references#smartphones, which means that the most efficient text generation model uses as much energy as 16% of a full smartphone charge for 1,000 inferences, whereas the least efficient image generation model uses as much energy as 950 smartphone charges (11.49 kWh), or nearly 1 charge per image generation, although there is also a large variation between image generation models, depending on the size of image that they generate.
+
+
+
+
+
+
+inference energy (kWh)
+
+
+task
+mean
+std
+
+
+text classification
+0.002
+0.001
+
+
+extractive QA
+0.003
+0.001
+
+
+masked language modeling
+0.003
+0.001
+
+
+token classification
+0.004
+0.002
+
+
+image classification
+0.007
+0.001
+
+
+object detection
+0.038
+0.02
+
+
+text generation
+0.047
+0.03
+
+
+summarization
+0.049
+0.01
+
+
+image captioning
+0.063
+0.02
+
+
+image generation
+2.907
+3.31
+
+
+
+Table 2. Mean and standard deviation of energy per 1,000 queries for the ten tasks examined in our analysis.
+
+
+We can also observe that there is a large variation in the amount of energy used, from the least energy-intensive task, text classification, with mean consumption of 0.002 KwH per 1,000 inferences, to the most energy-intensive one, image generation, whose mean consumption is 2.9kWh. This means that the different models examined in our study can vary by a factor of over 1450 in terms of the energy required to perform the same number of inferences.
+Intuitively, this is coherent given the decision space that different types of models have - from a binary classification task such as sentiment analysis (which can only output, for instance, a 0 for negative sentiment and a 1 for positive) to an entire vocabulary for text generation and summarization models. The length of text generated also impacts energy usage: on average, text generation uses 15 times more energy than masked language modeling, which makes sense given that the masked language modeling task only generates a single token, whereas in our setup the text generation task generates 10 new tokens for each input text, with the length of the input text rising as new tokens are generated, since each sequence of tokens gets fed back into the model to generate subsequent tokens. Finally, for image-based tasks, the level of abstraction is lower and the decision space is larger given that they generate raw pixels as opposed to tokens for text, making image-based tasks more energy intensive than text based ones, e.g. image classification uses over 3 times more energy than text classification (0.007 vs. 0.002 kWh) and image generation uses, on average, over 60 times more energy than text generation (0.047 vs. 2.9 kWh).
+
+
+Figure 2. The 5 modalities examined in our study, with the number of parameters of each model on the x axis and the average amount of carbon emitted for 1000 inferences on the y axis. NB: Both axes are in logarithmic scale.
+
+
+Next, we examine the respective influences of model size and task structure on model emissions. Figure 2 shows the relationship between model emissions (in grams of C​O2𝐶subscript𝑂2CO_{2} per 1,000 inferences) and sizes (in terms of the number of parameters) across the task categories listed in Section 3.1.
+We do observe a relationship between model size and quantity of emissions produced during inference, with differing progressions for each modality – however, the task structure accounts for more of the variation than the model size does. We can observe once again that text-to-image is by far the most carbon- and energy-intensive task, with smaller image generation models such as segmind/tiny-sd that have around 500M parameters producing magnitudes more carbon than text-to-category models (100g vs. 0.6 g of C​O2𝐶subscript𝑂2CO_{2} per 1,000 inferences). Within the text-to-text tasks, we see two separate sets of models : the masked language modeling task following a lower trend, producing emissions akin to text-to-category models, compared to text generation and summarization tasks, which produce similar amounts of carbon to the image captioning models with a similar number of parameters. For context, the most carbon-intensive image generation model (stable-diffusion-xl-base-1.0) generates 1,594 grams of C​O2𝐶subscript𝑂2CO_{2} for 1,000 inferences, which is roughly the equivalent to 4.1 miles driven by an average gasoline-powered passenger vehicle 555See https://www.epa.gov/energy/greenhouse-gases-equivalencies-calculator-calculations-and-references#miles for more details., whereas the least carbon-intensive text generation model (distilbert-base-uncased) generates as much carbon as 0.0006 miles driven by a similar vehicle, i.e. 6,833 times less. This can add up quickly when image generation models such as Dall·E and MidJourney are deployed in user-facing applications and used by millions of users globally (we discuss this point further in Section 5).
+
+
+The (high-level) takeaway of this analysis is that even for models specifically trained to carry out a single task, there is a large level of variation both within each task and an even larger one between tasks from different modalities. In essence, tasks that map both image and text inputs to categorical outputs are less energy- and carbon-intensive than those that generate text or images. Making these distinctions can help inform policies seeking to mitigate the environmental impacts of AI, given that it is important to be aware of this variation, which can sometimes reach several orders of magnitude. In the next section, we delve deeper into multi-purpose systems, which are meant to carry out several tasks concurrently, to better understand their environmental impacts and how they compare to task-specific models.
+
+
+
+
+4.2. The environmental cost of multi-purpose systems
+
+The second part of our analysis examines multi-task models of two types: decoder only, from the BLOOMz family, and sequence-to-sequence models from the FLAN-T5 family, with the goal of comparing energy intensity and carbon emissions of models with differing numbers of parameters when applied to different tasks. To address this question, we selected a subset of 3 tasks – text classification, extractive question answering, and summarization – given their diversity and broad applicability in a variety of settings, and compare the 8 zero-shot models of different sizes, based on the same 3 datasets per task as described in Table 1.
+
+
+
+
+4.2.1. Emissions of task-specific and multi-task architectures
+
+To start our analysis, we examined how the choice of model and architecture type impacts emissions given a specific task and dataset. For this analysis, we took the same 8 task-specific models described in Section 3.2 and compared their emissions to the 8 multi-purpose models described above.
+
+
+Figure 3. Model emissions (measured in g C​O2𝐶subscript𝑂2CO_{2}) and architecture type for each of the datasets from our analysis. The y axis is in logarithmic scale, dot size is proportional to model size.
+
+
+In Figure 3, we plot the mean query emissions for each model on a dataset-by-dataset basis. We can see that for the two discriminative tasks, sentiment analysis (which includes SST 2, Rotten Tomatoes and IMDB datasets) and question answering (which encompasses SciQ, SQuAD and SQuAD v2) there is a clear distinction between task-specific discriminative models (in blue), which have less emissions than both multi-purpose sequence-to-sequence (in yellow) and decoder-only generative models (in green). Given that the y axis in Figure 3 is in logarithmic scale, this indicates that the difference is several orders of magnitude - e.g. with the most efficient task-specific models emit 0.3g of C​O2𝐶subscript𝑂2CO_{2} per 1,000 inferences for extractive question answering on a dataset like SciQ, multi-purpose models emit 10g for the same task. This result follows intuitions derived from the model structures: while a task-specific model trained on binary text classification will carry out a softmax on a two-category vector to predict a class, a multi-purpose model will generate ’positive’ or ’negative’, which logically requires more energy because the prediction is based on the model’s entire vocabulary.
+For the generative task, summarization (represented by the SAMsum, XSum and CNN-Daily Mail datasets), the task-specific and multi-purpose models are closer in terms of emissions: task-specific sequence-to-sequence models generate 4-10g of C​O2𝐶subscript𝑂2CO_{2} for 1,000 inferences, while multi-purpose models emit 20-30g for the same task. The difference appears to mostly come from model size – all of the task-specific summarization models we looked at were 600 million parameters at most, compared to the larger multi-purpose architectures, which attained the 11 billion parameters.
+
+
+We also carry out an evaluation of both the task-specific and multi-purpose models examined in our study to ensure that they have comparable performance. For task-specific models, we used the evaluate library (Von Werra et al., 2022) and the LM Evaluation Harness (Gao et al., 2021) for zero-shot models. Fundamentally speaking, it is hard to compare task-specific and multi-purpose models using the same metrics, given that task-specific models have a much more constrained decision space (e.g. two classes in the case of binary text classification), whereas multi-purpose models have a large output vocabulary to choose from, and are dependent upon the prompt schema and prompting strategy used. However, by utilizing two standardized packages (evaluate and lm-evaluation-harness) and keeping the prompting approach stable across zero-shot models, we endeavor to standardize our evaluation approach as much as possible.
+
+
+Figure 4. Model size, measured in number of parameters (x axis, logarithmic scale) and text classification accuracy (y axis), with dot size indicating the quantity of emissions (logarithmic scale).
+
+
+We hone in on one specific task, text classification, in Figure 4, which illustrates the relationship between model size (x axis, in logarithmic scale), accuracy (y axis) and emissions (dot size, in logarithmic scale). Among task-specific encoder models, we observe that accuracy varies more widely, i.e. there are several smaller models of similar size and comparably small amounts of carbon emissions, with widely varying levels of accuracy. The multi-purpose models vary less in terms of accuracy, having higher average accuracy overall. Both sequence-to-sequence and decoder-only models produce comparable amounts of emissions (several orders of magnitude more than task-specific models).
+We can see that mid-size multi-purpose models (in the 3B parameter range) may have slightly better accuracy compared to both larger and smaller models. However, given the many caveats and specificities involved in multi-purpose LLM evaluation, this difference may not be significant. We present the full results of our evaluation, which include the other 2 tasks, in Section B in the Supplementary Materials.
+
+
+
+
+4.2.2. Differences within multi-purpose architectures
+
+Beyond the differences between task-specific and multi-purpose models generally, we also observed variation within the multi-purpose models that we examined. We present our results in Table 3; in it, we can observe that on a per-architecture basis (i.e. within the family of decoder-only models and the family of sequence-to-sequence models), size and emissions are correlated, with smaller models emitting less carbon and using less energy. However, sequence-to-sequence models are more efficient than their decoder-only counterparts when models of the same size are compared: for instance, Flan-T5-XL and BLOOMz-3B are both of a similar size (around 3B parameters), but the former generates, on average, 2 grams of emissions less for 1,000 inferences than the latter. This difference holds when comparing Flan-T5-XXL, which is the biggest model in terms of parameter count in the multi-purpose models that we tested (11 billion), yet it has lower emissions (11.48g on average) compared to the smaller BLOOMz-7B. Comparing the models on a per-task basis in Figure 5, we can see the same pattern for zero-shot models as for task-specific ones, with text classification a less carbon-intensive task compared to question answering, and summarization the most intensive one of the three. The spread between the tasks is smaller for sequence-to-sequence models (indicated with dots in Figure 5), whereas for decoder-only models (indicated with crosses), the difference between the different tasks is more significant.
+
+
+
+
+
+seq2seq models
+decoder-only models
+
+
+
+
+
+model
+
+
+name
+
+
+
+
+
+
+number of
+
+
+parameters
+
+
+
+
+
+
+emissions
+
+
+
+(g C​O2𝐶subscript𝑂2CO_{2})
+
+
+
+
+
+
+
+energy
+
+
+(kWh)
+
+
+
+
+
+
+model
+
+
+name
+
+
+
+
+
+
+number of
+
+
+parameters
+
+
+
+
+
+
+emissions
+
+
+
+(g C​O2𝐶subscript𝑂2CO_{2})
+
+
+
+
+
+
+
+energy
+
+
+(kWh)
+
+
+
+
+
+
+
+Flan-T5-base
+222M
+3.67
+0.026
+BLOOMz-560M
+559M
+7.5
+0.054
+
+
+Flan-T5-large
+750M
+7.68
+0.055
+BLOOMz-1B
+1.7B
+8.66
+0.062
+
+
+Flan-T5-xl
+2.8B
+8.08
+0.058
+BLOOMz-3B
+3B
+10.17
+0.073
+
+
+Flan-T5-xxl
+11B
+11.48
+0.083
+BLOOMz-7B
+7B
+14.46
+0.104
+
+
+
+Table 3. Zero-shot models in our analysis with their architecture type, model size (in number of parameters), average quantity of emissions (in g of C​O2𝐶subscript𝑂2CO_{2}) and average energy usage (in kWh) for 1,000 inferences.
+
+
+We can analyse the relationship between sequence-to-sequence and decoder-only models noted in Table 3: whereas for tasks such as summarization, decoder models do generate more emissions than sequence-to-sequence models of a similar size, for question answering and text classification, the two architectures have similar emissions.
+
+
+This can again be explained by the differences in the model structures, specifically the attention mechanism: while sequence-to-sequence models only attend to the last layer of the input when producing their answers, decoder-only architectures attend to all layers for the full sequence – leading to a stronger dependency on the output length for the number of operations, resulting in more emissions for tasks with longer outputs.
+
+
+Figure 5. A plot of the total emissions (in grams of C​O2𝐶subscript𝑂2CO_{2}) for 1,000 inferences for all multi-purpose models.
+
+
+
+
+
+
+
+
+
+
+BLOOMz
+
+
+560M
+
+
+
+
+
+
+BLOOMz
+
+
+1B
+
+
+
+
+
+
+BLOOMz
+
+
+3B
+
+
+
+
+
+
+BLOOMz
+
+
+7B
+
+
+
+
+
+
+Flan-T5
+
+
+base
+
+
+
+
+
+
+Flan-T5
+
+
+large
+
+
+
+
+
+
+Flan-T5
+
+
+xl
+
+
+
+
+
+
+Flan-T5
+
+
+xxl
+
+
+
+
+
+dataset
+input
+output
+output
+output
+output
+output
+output
+output
+output
+
+
+
+
+IMDB
+58.73
+1.64
+2.61
+1.72
+1.53
+1.00
+1.00
+1.00
+1.00
+
+
+
+
+
+Rotten
+
+
+Tomatoes
+
+
+
+30.08
+1.00
+0.99
+1.03
+1.00
+1.00
+1.00
+1.00
+1.00
+
+
+SST 2
+28.35
+0.98
+0.99
+1.01
+1.02
+1.00
+1.00
+1.00
+1.00
+
+
+SciQ
+113.12
+1.28
+1.25
+1.10
+1.10
+2.03
+5.41
+3.12
+2.42
+
+
+SQuAD
+134.00
+1.93
+1.96
+2.02
+1.95
+2.01
+2.15
+2.16
+2.13
+
+
+SQuAD 2
+115.85
+2.33
+2.54
+2.58
+2.41
+2.28
+2.74
+2.71
+2.58
+
+
+CNN
+54.00
+12.05
+11.91
+11.73
+10.34
+8.52
+11.34
+11.34
+10.68
+
+
+SamSUM
+47.82
+9.54
+9.41
+9.75
+9.85
+10.56
+11.05
+10.18
+10.57
+
+
+XSum
+53.85
+11.53
+12.22
+11.94
+11.92
+12.95
+13.62
+13.49
+13.09
+
+
+
+Table 4. Average input and output length (in number of tokens) for the 8 zero-shot models and 9 tasks examined as part of our study. The darker the cell, the more carbon was output by the model for the task.
+
+
+We further verify this intuition in Table 4 and Figure 6: while there is some variation between models and datasets in Table 4, the distribution of output lengths is consistent with our expectations for the different task categories: tasks with longer outputs result in more emissions, especially for decoder-only models. Figure 6 delves further into the relationship between average output length, carbon emissions, and model structures for the different summarization datasets. It shows a clear correlation between output length and measured emissions, with a higher slope for the decoder-only architectures (the BLOOMz family of models) than for the sequence-to-sequence architectures (the Flan-T5 family of models).
+
+
+Figure 6. A plot of the output length (X axis) and carbon emissions (Y axis) for the summarization task. The symbol refers to the type of architecture (BLOOMz vs Flan-T5), symbol size references the relative model size (in terms of the number of parameters), and color the input length.
+
+
+As we have observed in the current section, there is no ’one-size-fits-all’ pattern for multi-purpose models either – they too exhibit variation in terms of their emissions and energy usage, which can be attributed to different factors, including model size and output length. This would indicate that more careful consideration is needed when making choices to deploy these models for different tasks and applying them in different scenarios. We further discuss our results and further avenues of research in the next and final section.
+
+
+
+
+
+4.3. Comparing model training and inference costs
+
+An important trade-off for many AI practitioners and policy-makers is determining when exactly model inference costs reach parity with model training (and fine-tuning) - i.e. when does the deployment of models use as much energy as their initial training? This comparison is often hard to make because it requires the total energy cost of all steps of the ML model life cycle, which is very rarely available. Of the models that we examined in our study, neither the BLOOMz nor the Flan-T5 families of models reported the total energy used nor carbon emitted during their training in the papers describing the models. However, given that the BLOOMz models are fine-tuned versions of the original BLOOM family of models (Workshop et al., 2022), we can base ourselves on the logs provided by the authors of the BLOOM carbon footprint estimation paper (Luccioni et al., 2022). We can add to these numbers the energy cost of fine-tuning each model, which we were able to estimate based on the training logs provided by the authors of the BLOOMz paper (Muennighoff et al., 2022), although we were lacking the necessary information to infer the carbon footprint 666The energy consumption can be based on the Thermal Design Power (TDP) of the GPUs used – while it assumes 100% GPU utilization, it is the most accurate estimate possible without energy usage tracking during training.. We present these numbers, alongside the average energy consumption per inference, in Table 5. We can see that the amount of energy required per inference varies from 5.4 × 10−5superscript10510^{-5} for the smallest model, BLOOMz-560M to 1.0 × 10−4superscript10410^{-4} kWh for the biggest one, BLOOMz-7B. This is coherent to the numbers reported by Luccioni et al. for BLOOM-176B, which required, on average, 0.004 kWh of energy per query, or 40 times more than BLOOMz-7B, being roughly 25 times bigger (Luccioni et al., 2022) - although this included API deployment of the model, which is not the case for the models in our study.
+
+
+
+
+
+
+BLOOMz-7B
+BLOOMz-3B
+BLOOMz-1B
+BLOOMz-560M
+
+
+
+
+Training energy (kWh)
+51,686
+25,634
+17,052
+10,505
+
+
+Finetuning energy (kWh)
+7,571
+3,242
+1,081
+543
+
+
+Inference energy (kWh)
+1.0 × 10−4superscript10410^{-4}
+
+7.3 × 10−5superscript10510^{-5}
+
+6.2 × 10−5superscript10510^{-5}
+
+5.4 × 10−5superscript10510^{-5}
+
+
+
+
+
+
+Cost parity (# inferences)
+
+
+
+592,570,000
+395,602,740
+292,467,741
+204,592,592
+
+
+
+Table 5. The BLOOMz models from our study with their training energy cost (from (Luccioni et al., 2022)), finetuning energy cost (from (Muennighoff et al., 2022)), inference cost (from the present study), and cost parity, as the number of inferences required to sum to the training cost.
+
+
+If we compare the amount of energy used per inference for each of the models with the total amount of energy used for both training and fine-tuning them, we can estimate how many inferences would be needed to be carried out with a given model in order for the cost of inference to reach the cost of training. As can be seen in Table 5, this varies depending on model size: from around 200 million inferences for the smallest model, BLOOMz-560M, to over 590 million inferences for the biggest model, BLOOMz-7B. This may seem like a lot if a single instance of a model is deployed, but can add up quickly if there are multiple instances of models deployed in parallel. For instance, it has been estimated that, at its peak, ChatGPT had upward of 10 million users per day (Oremus, 2023); the most recent statistics indicate that the ChatGPT login page received 1.7B visits in October 2023 777According to SimilarWeb: https://www.similarweb.com/website/chat.openai.com/.. Even assuming a single query per user, which is rarely the case, the energy costs of deploying it would surpass its training costs after a few weeks or months of deployment.
+
+
+While the BLOOMz models are not deployed in real-time in the same manner as ChatGPT, they have been downloaded hundreds of thousands of times from the Hugging Face Hub, which would indicate that they have been extensively used by the open-source community: at the time of writing this article (November 2023), BLOOMz-7B has been downloaded 606,096 times, BLOOMz-3B has been downloaded 357,368 times, BLOOMz-1B has been downloaded 61,757 times and BLOOMz-560m has been downloaded 498,601 times. They have also been finetuned for a number of downstream tasks, such as chat, and deployed in HuggingFace Spaces, interactive interfaces for model interaction. While this analysis represents a relatively small sample of models,
+analyses such as this are vital for estimating the relative energy consumption (and ensuing emissions) of different stages of the ML training and deployment cycle, understanding trade-offs between training and inference emissions patterns, and characterizing the lifetime emissions of ML models, and we hope that others will be possible in the future, which would require more transparency from model creators regarding both the up front (i.e. training) and downstream (i.e. inference) costs of ML models. We discuss the importance of transparency and other important actions that members of the community can take in the next, and final, section of our paper.
+
+
+
+
+
+
+5. Discussion
+
+There have been limited studies regarding the energy consumption and carbon emissions of LLM inference, largely due to its distributed nature — compared to the relatively time- and location-constrained nature of training — making it difficult to make meaningful comparisons between different models and tasks. In this work, we have endeavored to keep as many parameters stable as possible, including the code, hardware, datasets, batch size and Python library. We provide all of the code that we used for our analysis as well as an interactive tool to allow users to more deeply explore the results we present here. We also highlight the main high-level takeaways of our study below:
+
+
+Generative tasks are more energy- and carbon-intensive compared to discriminative tasks
+
+As shown in Figure 1, the most energy- and carbon-intensive tasks are those that generate new content: text generation, summarization, image captioning, and image generation.
+
+
+
+Tasks involving images are more energy- and carbon-intensive compared to those involving text alone
+
+More specifically, tasks involving predicting categories (text-to-category, image-to-category) are less energy-intensive than those involving generating images (e.g. text-to-image), with those involving text between the two (see Figure 2).
+
+
+
+Decoder-only models are slightly more energy- and carbon- intensive than sequence-to-sequence models for models of a similar size and applied to the same tasks
+
+The findings we present in Table 3, Figure 3, and Figure 6 would indicate that more computation (i.e. energy) is required for decoder-only tasks, and that this phenomenon is particularly marked for tasks with longer outputs.
+This observation is worth verifying for other architectures from both categories, and well as other tasks and datasets.
+
+
+
+Training remains orders of magnitude more energy- and carbon- intensive than inference
+
+We have provided initial numbers for comparing the relative energy costs of model training, finetuning and inference for different sizes of models from the BLOOMz family, and found that the parity between training/finetuning and inference grows with model size. While the ratio is hundreds of millions of inferences for a single training, given the ubiquity of ML model deployment, this parity can be reached quickly for many popular models.
+
+
+
+Using multi-purpose models for discriminative tasks is more energy-intensive compared to task-specific models for these same tasks
+
+This is especially the case for text classification (on IMDB, SST 2 and Rotten Tomatoes) and question answering (on SciQ, SQuAD v1 and v2), where the gap between task-specific and zero-shot models is particularly large, and less so for summarization (for CNN-Daily Mail, SamSUM and XSum). As can be seen in Table 4, the difference between multi-purpose models and task-specific models is amplified as the length of output gets longer. 
+
+
+
+We find this last point to be the most compelling takeaway of our study, given the current paradigm shift away from smaller models finetuned for a specific task towards models that are meant to carry out a multitude of tasks at once, deployed to respond to a barrage of user queries in real time. This transition has been happening both in ML research since the advent of GPT-3 (Brown et al., 2020), which illustrated the potential for few- and zero-shot learning with language models, as well as in consumer settings, with LLMs such as GPT-4 and PaLM being deployed in user-facing products such as web search (Bing, 2023; Google, 2023b), email, and navigation (Google, 2023a), where smaller, task-specific versions of models such as BERT were previously used (Bing, 2019; Google, 2019). While it is hard to quantify the environmental impacts of this transition given the lack of transparency of technology companies regarding both the number of parameters, architecture and carbon emissions of their products, we can make a comparison based on the experiments carried out in the present study. For instance, the average emissions of a BERT-based model fine-tuned for extractive question answering (bert-large-uncased-whole-word-masking-finetuned-squad), a task akin to extractive web search, is 0.70g C​O2𝐶subscript𝑂2CO_{2} per 1,000 queries, which is less than 3 times that of the multi-purpose models (2.36g for Flan-T5 base and 2.34g for BLOOMz-560M). The difference is much more drastic if comparing BERT-based models for tasks such as text classification with the larger multi-purpose models: for instance bert-base-multilingual-uncased-sentiment emits just 0.32g of C​O2𝐶subscript𝑂2CO_{2} per 1,000 queries, compared to 2.66g for Flan-T5-XL and 4.67g for BLOOMz-7B. For comparison, the first PaLM model, released in 2022, has 540 billion parameters (Chowdhery et al., 2022), whereas GPT-3 has 175 billion parameters (Brown et al., 2020) 888The exact number of parameters of GPT-4 and PaLM 2 have not been publicly shared.. While we see the benefit of deploying generative zero-shot models given their ability to carry out multiple tasks, we do not see convincing evidence for the necessity of their deployment in contexts where tasks are well-defined, for instance web search and navigation, given these models’ energy requirements.
+
+
+Finally, the intent of our study is to set the stage for better understanding of the energy requirements and carbon emissions of the final, often overlooked, step in the ML model life cycle: model deployment. The comparison between training, finetuning and inference energy requirements carried out in Section 4.3 is, to our knowledge, the first comparison of its kind, and paves the way to a better understanding of how the different stages of an ML model’s lifecycle add up in terms of energy use. These are important data points that can help inform both our fellow AI researchers and practitioners, as well as policy-makers who are working towards estimating and regulating the environmental impacts of AI models and ICT in general. We recognize that our study is not representative of all deployment contexts and constraints – our intent is to establish a set of initial data points and to set the stage for testing and comparing other models. In fact, our study highlights many potential avenues for future research aimed towards a better understanding of the myriad factors that influence the efficiency of inference, including the choice of architecture, the usage of techniques such as distillation, the number of parameters, the choice of hardware and the numerical (i.e. floating point) precision of model parameters. While we encourage continued work analysing open-source models, we note that the growing lack of transparency in model architecture and training details
+
+
+makes this line of work, alongside many branches relating to fairness and accountability in machine learning, increasingly difficult to carry out. Given our findings and the increased deployment of generative, multi-purpose AI models, we hope that both ML researchers and practitioners will practice transparency regarding the nature and impacts of their models, to enable better understanding of their environmental impacts.
+
+
+Acknowledgements.
+We thank Will Alpine, Priya Donti, Régis Pierrard, David Rolnick, Roy Schwartz and Rajiv Shah for their useful feedback and suggestions.
