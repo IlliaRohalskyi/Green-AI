@@ -40,7 +40,7 @@ Follow these steps to set up GreenAI on your local machine:
    ollama serve
    ```
 
-8. Run the application:
+7. Run the application:
     ```bash
     python /src/webapp/app.py
     ```
