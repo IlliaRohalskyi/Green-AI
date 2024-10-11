@@ -35,7 +35,12 @@ Follow these steps to set up GreenAI on your local machine:
    ollama pull phi3:mini
    ```
 
-6. Run the application:
+6. Start Ollama server
+   ```bash
+   ollama serve
+   ```
+
+8. Run the application:
     ```bash
     python /src/webapp/app.py
     ```
